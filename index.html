@@ -1,0 +1,338 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Play, Pause, RefreshCw, Target, Activity, Info } from 'lucide-react';
+
+const App = () => {
+  // --- Simulation State ---
+  const [isRunning, setIsRunning] = useState(false);
+  const [precision, setPrecision] = useState(0.001);
+  const [inversionRadius, setInversionRadius] = useState(150);
+  const [speed, setSpeed] = useState(2);
+  const [windingNumber, setWindingNumber] = useState(0);
+  const [cornerHits, setCornerHits] = useState(0);
+  const [trailLength, setTrailLength] = useState(5000);
+  const [showInversionCircle, setShowInversionCircle] = useState(true);
+
+  // --- Refs for Animation & Canvas ---
+  const canvasRef = useRef(null);
+  const requestRef = useRef(null);
+  const stateRef = useRef({
+    pos: { x: 50, y: 50 },
+    vel: { x: 1.5, y: 1.2 },
+    path: [],
+    bounds: { size: 300 }
+  });
+
+  // --- Initialization ---
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleResize = () => {
+      const container = canvas.parentElement;
+      if (container) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // --- Geometric Inversion Logic ---
+  const invertPoint = (x, y, cx, cy, r) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const distSq = dx * dx + dy * dy;
+    if (distSq === 0) return { x, y };
+    const factor = (r * r) / distSq;
+    return {
+      x: cx + dx * factor,
+      y: cy + dy * factor
+    };
+  };
+
+  // --- Main Simulation Loop ---
+  const update = () => {
+    const s = stateRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const halfSize = s.bounds.size / 2;
+
+    for (let i = 0; i < speed; i++) {
+      // Move
+      s.pos.x += s.vel.x;
+      s.pos.y += s.vel.y;
+
+      // Square Boundary Collision (Billiard Logic)
+      // Boundary is centered at (cx, cy)
+      const left = cx - halfSize;
+      const right = cx + halfSize;
+      const top = cy - halfSize;
+      const bottom = cy + halfSize;
+
+      let hitCornerX = false;
+      let hitCornerY = false;
+
+      if (s.pos.x <= left || s.pos.x >= right) {
+        s.vel.x *= -1;
+        s.pos.x = s.pos.x <= left ? left : right;
+        if (Math.abs(s.pos.y - top) < 5 || Math.abs(s.pos.y - bottom) < 5) hitCornerX = true;
+      }
+      if (s.pos.y <= top || s.pos.y >= bottom) {
+        s.vel.y *= -1;
+        s.pos.y = s.pos.y <= top ? top : bottom;
+        if (Math.abs(s.pos.x - left) < 5 || Math.abs(s.pos.x - right) < 5) hitCornerY = true;
+      }
+
+      if (hitCornerX || hitCornerY) {
+        setCornerHits(prev => prev + 1);
+        // Simple Winding Logic: Increment based on clockwise/counter-clockwise movement 
+        // relative to center when a corner is hit
+        setWindingNumber(prev => prev + (s.vel.x * s.vel.y > 0 ? 1 : -1));
+      }
+
+      // Record path
+      const inverted = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
+      s.path.push(inverted);
+      if (s.path.length > trailLength) s.path.shift();
+    }
+
+    // --- Rendering ---
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Inversion Circle
+    if (showInversionCircle) {
+      ctx.beginPath();
+      ctx.arc(cx, cy, inversionRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.setLineDash([5, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw Square Boundary (Source)
+    ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+    ctx.strokeRect(cx - halfSize, cy - halfSize, s.bounds.size, s.bounds.size);
+
+    // Draw Inverted Path (Hologram)
+    if (s.path.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(s.path[0].x, s.path[0].y);
+      for (let i = 1; i < s.path.length; i++) {
+        ctx.lineTo(s.path[i].x, s.path[i].y);
+      }
+      const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
+      gradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)');
+      gradient.addColorStop(1, 'rgba(236, 72, 153, 0.1)');
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Draw Current Particle
+    const currentInv = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
+    ctx.beginPath();
+    ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#f472b6';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#f472b6';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    requestRef.current = requestAnimationFrame(update);
+  };
+
+  useEffect(() => {
+    if (isRunning) {
+      requestRef.current = requestAnimationFrame(update);
+    } else {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    }
+    return () => {
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+    };
+  }, [isRunning, speed, inversionRadius, trailLength]);
+
+  const resetSimulation = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      stateRef.current.path = [];
+      stateRef.current.pos = { x: canvas.width / 2 + 20, y: canvas.height / 2 + 20 };
+      setCornerHits(0);
+      setWindingNumber(0);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
+      {/* Header */}
+      <header className="flex items-center justify-between px-6 py-4 bg-slate-900/50 border-b border-slate-800 backdrop-blur-md z-10">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+            <Activity size={24} />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">Holographic Inversion</h1>
+            <p className="text-xs text-slate-400 uppercase tracking-widest font-medium">Billiard Square Simulation</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6 px-4 py-2 bg-slate-800/40 rounded-full border border-slate-700/50">
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-slate-500 uppercase font-bold">Winding</span>
+              <span className="text-sm font-mono text-emerald-400">{windingNumber}</span>
+            </div>
+            <div className="w-px h-8 bg-slate-700"></div>
+            <div className="flex flex-col items-center">
+              <span className="text-[10px] text-slate-500 uppercase font-bold">Corner Hits</span>
+              <span className="text-sm font-mono text-amber-400">{cornerHits}</span>
+            </div>
+          </div>
+          
+          <button 
+            onClick={() => setIsRunning(!isRunning)}
+            className={`flex items-center gap-2 px-6 py-2 rounded-full font-bold transition-all ${
+              isRunning 
+              ? 'bg-rose-500 hover:bg-rose-600 shadow-lg shadow-rose-500/20' 
+              : 'bg-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/20'
+            }`}
+          >
+            {isRunning ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+            {isRunning ? 'Pause' : 'Start'}
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex relative">
+        {/* Sidebar Controls */}
+        <aside className="w-80 bg-slate-900/30 border-r border-slate-800 p-6 overflow-y-auto backdrop-blur-sm z-10">
+          <section className="space-y-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4 text-slate-400">
+                <Settings size={16} />
+                <h2 className="text-xs font-bold uppercase tracking-wider">Parameters</h2>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs">
+                    <label className="text-slate-400 font-medium">Inversion Radius</label>
+                    <span className="text-indigo-400 font-mono">{inversionRadius}px</span>
+                  </div>
+                  <input 
+                    type="range" min="50" max="300" value={inversionRadius} 
+                    onChange={(e) => setInversionRadius(parseInt(e.target.value))}
+                    className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs">
+                    <label className="text-slate-400 font-medium">Simulation Speed</label>
+                    <span className="text-indigo-400 font-mono">x{speed}</span>
+                  </div>
+                  <input 
+                    type="range" min="1" max="10" value={speed} 
+                    onChange={(e) => setSpeed(parseInt(e.target.value))}
+                    className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex justify-between text-xs">
+                    <label className="text-slate-400 font-medium">Trail Resolution</label>
+                    <span className="text-indigo-400 font-mono">{trailLength} pts</span>
+                  </div>
+                  <input 
+                    type="range" min="100" max="10000" step="100" value={trailLength} 
+                    onChange={(e) => setTrailLength(parseInt(e.target.value))}
+                    className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-slate-800">
+              <div className="flex items-center gap-2 mb-4 text-slate-400">
+                <Target size={16} />
+                <h2 className="text-xs font-bold uppercase tracking-wider">Visualization</h2>
+              </div>
+              <div className="space-y-4">
+                <label className="flex items-center justify-between p-3 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50 transition-colors">
+                  <span className="text-sm font-medium">Show Inversion Circle</span>
+                  <input 
+                    type="checkbox" checked={showInversionCircle} 
+                    onChange={() => setShowInversionCircle(!showInversionCircle)}
+                    className="w-4 h-4 rounded accent-indigo-500"
+                  />
+                </label>
+                
+                <button 
+                  onClick={resetSimulation}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 hover:bg-slate-800 transition-all text-slate-300 font-semibold"
+                >
+                  <RefreshCw size={16} />
+                  Reset Path
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+              <div className="flex items-center gap-2 mb-2 text-indigo-400">
+                <Info size={14} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Concept Note</span>
+              </div>
+              <p className="text-xs text-slate-400 leading-relaxed italic">
+                The winding number increases as the billiard path circles the origin within the square. Inversion maps the infinite exterior to the interior of the circle, creating "holographic" dualities.
+              </p>
+            </div>
+          </section>
+        </aside>
+
+        {/* Canvas Display */}
+        <div className="flex-1 bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)] relative">
+          <canvas 
+            ref={canvasRef} 
+            className="w-full h-full block"
+          />
+          
+          {/* Overlay UI elements */}
+          <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end pointer-events-none">
+            <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-4 rounded-2xl min-w-[200px] pointer-events-auto shadow-2xl">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`}></div>
+                <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">System Status</span>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Particle Engine</span>
+                  <span className={isRunning ? 'text-emerald-400 font-medium' : 'text-rose-400 font-medium'}>
+                    {isRunning ? 'Active' : 'Paused'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Inversion Mapping</span>
+                  <span className="text-slate-300">Continuous</span>
+                </div>
+                <div className="flex justify-between text-xs pt-2 mt-2 border-t border-slate-800">
+                  <span className="text-slate-500">Target Precision</span>
+                  <span className="text-indigo-400 font-mono">{precision}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default App;
