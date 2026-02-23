@@ -32,28 +32,39 @@
         const CpuIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>;
 
         // ==========================================
-        // TAB 1: ORIGINAL BILLIARD INVERSION
+        // TAB 1: BILLIARD INVERSION (RESPONSIVE)
         // ==========================================
         const BilliardSim = () => {
           const [isRunning, setIsRunning] = useState(false);
-          const [precision, setPrecision] = useState(0.001);
-          const [inversionRadius, setInversionRadius] = useState(150);
+          const [inversionRadius, setInversionRadius] = useState(100);
           const [speed, setSpeed] = useState(2);
           const [windingNumber, setWindingNumber] = useState(0);
           const [cornerHits, setCornerHits] = useState(0);
-          const [trailLength, setTrailLength] = useState(5000);
+          const [configsRegistered, setConfigsRegistered] = useState(0);
+          const [trailLength, setTrailLength] = useState(3000);
           const [showInversionCircle, setShowInversionCircle] = useState(true);
+          const [showDynamicGrid, setShowDynamicGrid] = useState(true);
 
           const canvasRef = useRef(null);
           const requestRef = useRef(null);
-          const stateRef = useRef({ pos: { x: 50, y: 50 }, vel: { x: 1.5, y: 1.2 }, path: [], bounds: { size: 300 } });
+          const stateRef = useRef({ 
+            pos: { x: null, y: null }, vel: { x: 1.8, y: 1.3 }, 
+            stdPath: [], invPath: [], gridPhase: 0, configCounter: 0, frameCount: 0 
+          });
 
           useEffect(() => {
             const canvas = canvasRef.current;
             if (!canvas) return;
             const handleResize = () => {
               const container = canvas.parentElement;
-              if (container) { canvas.width = container.clientWidth; canvas.height = container.clientHeight; }
+              if (container) { 
+                canvas.width = container.clientWidth; 
+                canvas.height = container.clientHeight; 
+                // Reset position to center on resize to prevent getting stuck outside bounds
+                if (!stateRef.current.pos.x) {
+                  stateRef.current.pos = { x: canvas.width/2, y: canvas.height/2 };
+                }
+              }
             };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100); 
@@ -71,49 +82,95 @@
             const s = stateRef.current; const canvas = canvasRef.current;
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
-            const cx = canvas.width / 2; const cy = canvas.height / 2; const halfSize = s.bounds.size / 2;
+            const cw = canvas.width; const ch = canvas.height;
+            const cx = cw / 2; const cy = ch / 2; 
+            
+            // Scaled down to 0.55 to guarantee all bounce information is fully visible
+            const boundSize = Math.min(cw, ch) * 0.55; 
+            const halfSize = boundSize / 2;
+
+            // Ensure ball is initialized
+            if (s.pos.x === null) s.pos = { x: cx, y: cy };
 
             for (let i = 0; i < speed; i++) {
               s.pos.x += s.vel.x; s.pos.y += s.vel.y;
-              const left = cx - halfSize; const right = cx + halfSize; const top = cy - halfSize; const bottom = cy + halfSize;
+              
+              const left = cx - halfSize; const right = cx + halfSize; 
+              const top = cy - halfSize; const bottom = cy + halfSize;
               let hitCornerX = false; let hitCornerY = false;
 
-              if (s.pos.x <= left || s.pos.x >= right) {
-                s.vel.x *= -1; s.pos.x = s.pos.x <= left ? left : right;
-                if (Math.abs(s.pos.y - top) < 5 || Math.abs(s.pos.y - bottom) < 5) hitCornerX = true;
-              }
-              if (s.pos.y <= top || s.pos.y >= bottom) {
-                s.vel.y *= -1; s.pos.y = s.pos.y <= top ? top : bottom;
-                if (Math.abs(s.pos.x - left) < 5 || Math.abs(s.pos.x - right) < 5) hitCornerY = true;
-              }
+              // Constrain and bounce
+              if (s.pos.x <= left) { s.vel.x *= -1; s.pos.x = left + 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
+              else if (s.pos.x >= right) { s.vel.x *= -1; s.pos.x = right - 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
+              
+              if (s.pos.y <= top) { s.vel.y *= -1; s.pos.y = top + 1; hitCornerY = Math.abs(s.pos.x - left) < 15 || Math.abs(s.pos.x - right) < 15; }
+              else if (s.pos.y >= bottom) { s.vel.y *= -1; s.pos.y = bottom - 1; hitCornerY = Math.abs(s.pos.x - left) < 15 || Math.abs(s.pos.x - right) < 15; }
 
               if (hitCornerX || hitCornerY) {
                 setCornerHits(prev => prev + 1);
                 setWindingNumber(prev => prev + (s.vel.x * s.vel.y > 0 ? 1 : -1));
               }
 
+              // Record BOTH geometries simultaneously (Free artifacts)
+              s.stdPath.push({x: s.pos.x, y: s.pos.y});
+              if (s.stdPath.length > trailLength) s.stdPath.shift();
+
               const inverted = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
-              s.path.push(inverted);
-              if (s.path.length > trailLength) s.path.shift();
+              s.invPath.push(inverted);
+              if (s.invPath.length > trailLength) s.invPath.shift();
             }
 
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Config Registration & Grid Phase (Free Compute Metric)
+            s.gridPhase += 0.05 * speed;
+            s.configCounter += Math.floor(speed * 4);
+            s.frameCount++;
+            if (s.frameCount % 10 === 0) setConfigsRegistered(s.configCounter);
+
+            ctx.clearRect(0, 0, cw, ch);
+
+            // Draw Dynamic Configuration Grid inside boundary
+            if (showDynamicGrid) {
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)'; 
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              const phaseOffset = Math.sin(s.gridPhase) * 20;
+              for(let i = -halfSize; i <= halfSize; i+=30) {
+                  let x = cx + i + phaseOffset;
+                  if (x > cx - halfSize && x < cx + halfSize) { ctx.moveTo(x, cy - halfSize); ctx.lineTo(x, cy + halfSize); }
+                  let y = cy + i + Math.cos(s.gridPhase) * 20;
+                  if (y > cy - halfSize && y < cy + halfSize) { ctx.moveTo(cx - halfSize, y); ctx.lineTo(cx + halfSize, y); }
+              }
+              ctx.stroke();
+            }
 
             if (showInversionCircle) {
               ctx.beginPath(); ctx.arc(cx, cy, inversionRadius, 0, Math.PI * 2);
               ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-            ctx.strokeRect(cx - halfSize, cy - halfSize, s.bounds.size, s.bounds.size);
+            // Standard Boundary
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+            ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
 
-            if (s.path.length > 1) {
-              ctx.beginPath(); ctx.moveTo(s.path[0].x, s.path[0].y);
-              for (let i = 1; i < s.path.length; i++) ctx.lineTo(s.path[i].x, s.path[i].y);
+            // 1. Draw Standard Trajectory (Dual Artifact)
+            if (s.stdPath.length > 1) {
+              ctx.beginPath(); ctx.moveTo(s.stdPath[0].x, s.stdPath[0].y);
+              for (let i = 1; i < s.stdPath.length; i++) ctx.lineTo(s.stdPath[i].x, s.stdPath[i].y);
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // 2. Draw Inverted Trajectory (Dual Artifact)
+            if (s.invPath.length > 1) {
+              ctx.beginPath(); ctx.moveTo(s.invPath[0].x, s.invPath[0].y);
+              for (let i = 1; i < s.invPath.length; i++) ctx.lineTo(s.invPath[i].x, s.invPath[i].y);
               const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
               gradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)'); gradient.addColorStop(1, 'rgba(236, 72, 153, 0.1)');
               ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
             }
+
+            // Draw Current Particles (Standard & Inverted)
+            ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#38bdf8'; ctx.shadowBlur = 10; ctx.shadowColor = '#38bdf8'; ctx.fill(); ctx.shadowBlur = 0;
 
             const currentInv = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
             ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
@@ -126,19 +183,11 @@
             if (isRunning) requestRef.current = requestAnimationFrame(update);
             else if (requestRef.current) cancelAnimationFrame(requestRef.current);
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning, speed, inversionRadius, trailLength]);
-
-          const resetSimulation = () => {
-            if (canvasRef.current) {
-              stateRef.current.path = [];
-              stateRef.current.pos = { x: canvasRef.current.width / 2 + 20, y: canvasRef.current.height / 2 + 20 };
-              setCornerHits(0); setWindingNumber(0);
-            }
-          };
+          }, [isRunning, speed, inversionRadius, trailLength, showDynamicGrid]);
 
           return (
             <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-80 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[35vh] md:max-h-none">
+                <aside className="w-full md:w-72 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[35vh] md:max-h-none">
                   <section className="space-y-6">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">Controls</h2>
@@ -148,7 +197,7 @@
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Inversion Radius</label><span className="text-indigo-400 font-mono">{inversionRadius}px</span></div>
-                          <input type="range" min="50" max="300" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                          <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
                         </div>
                         <div className="space-y-2">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Speed</label><span className="text-indigo-400 font-mono">x{speed}</span></div>
@@ -158,10 +207,10 @@
                     </div>
                     <div className="pt-4 border-t border-slate-800 space-y-3">
                         <label className="flex items-center justify-between p-2 md:p-3 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50">
-                          <span className="text-xs md:text-sm font-medium">Show Inversion Circle</span>
-                          <input type="checkbox" checked={showInversionCircle} onChange={() => setShowInversionCircle(!showInversionCircle)} className="w-4 h-4 rounded accent-indigo-500" />
+                          <span className="text-xs md:text-sm font-medium">Dual Geometry Mesh</span>
+                          <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" />
                         </label>
-                        <button onClick={resetSimulation} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-sm">
+                        <button onClick={() => { stateRef.current.stdPath = []; stateRef.current.invPath = []; setCornerHits(0); setWindingNumber(0); stateRef.current.configCounter = 0; setConfigsRegistered(0); }} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-sm">
                           <RefreshCw size={14} /> Reset Path
                         </button>
                     </div>
@@ -171,7 +220,8 @@
                 <div className="flex-1 min-h-[50vh] bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)] relative">
                   <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                    <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3 rounded-xl min-w-[150px] shadow-2xl">
+                    <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3 rounded-xl min-w-[200px] shadow-2xl">
+                      <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Free Configs</span><span className="text-sky-400 font-mono">{configsRegistered.toLocaleString()}</span></div>
                       <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Winding</span><span className="text-emerald-400 font-mono">{windingNumber}</span></div>
                       <div className="flex justify-between text-xs"><span className="text-slate-500">Corners</span><span className="text-amber-400 font-mono">{cornerHits}</span></div>
                     </div>
@@ -180,7 +230,6 @@
             </div>
           );
         };
-
         // ==========================================
         // TAB 2: ZETA SWARM (SMITH & BLADE LOGIC)
         // ==========================================
@@ -195,20 +244,14 @@
           useEffect(() => {
             const canvas = canvasRef.current;
             if (!canvas) return;
-            const handleResize = () => {
-              const container = canvas.parentElement;
-              if (container) { canvas.width = container.clientWidth; canvas.height = container.clientHeight; }
-            };
+            const handleResize = () => { if (canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; } };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
 
             const bots = [];
-            for(let i=0; i<3; i++) bots.push({ id: `g1_${i}`, group: 1, x: window.innerWidth/2 + (Math.random()-0.5)*100, y: window.innerHeight - 100, vx: (Math.random()-0.5)*2, vy: -2 - Math.random(), color: '#22d3ee', size: 4 });
-            for(let i=0; i<5; i++) bots.push({ id: `g2_${i}`, group: 2, x: window.innerWidth/2 + (Math.random()-0.5)*200, y: 100, vx: (Math.random()-0.5)*2, vy: 2 + Math.random(), color: '#fb7185', size: 3 });
-            for(let i=0; i<7; i++) {
-                const angle = (i / 7) * Math.PI * 2;
-                bots.push({ id: `g3_${i}`, group: 3, x: window.innerWidth/2, y: window.innerHeight/2, vx: Math.cos(angle)*1.5, vy: Math.sin(angle)*1.5, color: '#fbbf24', size: 3 });
-            }
+            for(let i=0; i<3; i++) bots.push({ id: `g1_${i}`, group: 1, x: window.innerWidth/2, y: window.innerHeight - 100, vx: (Math.random()-0.5)*2, vy: -2, color: '#22d3ee', size: 4 });
+            for(let i=0; i<5; i++) bots.push({ id: `g2_${i}`, group: 2, x: window.innerWidth/2, y: 100, vx: (Math.random()-0.5)*2, vy: 2, color: '#fb7185', size: 3 });
+            for(let i=0; i<7; i++) { const angle = (i / 7) * Math.PI * 2; bots.push({ id: `g3_${i}`, group: 3, x: window.innerWidth/2, y: window.innerHeight/2, vx: Math.cos(angle)*1.5, vy: Math.sin(angle)*1.5, color: '#fbbf24', size: 3 }); }
             simState.current.bots = bots;
             return () => window.removeEventListener('resize', handleResize);
           }, []);
@@ -247,8 +290,8 @@
                 if (speed > 3) { bot.vx = (bot.vx/speed)*3; bot.vy = (bot.vy/speed)*3; }
 
                 bot.x += bot.vx; bot.y += bot.vy;
-                if (bot.x < 0 || bot.x > cw) bot.vx *= -1;
-                if (bot.y < 0 || bot.y > ch) bot.vy *= -1;
+                if (bot.x < 0) { bot.x = 0; bot.vx *= -1; } if (bot.x > cw) { bot.x = cw; bot.vx *= -1; }
+                if (bot.y < 0) { bot.y = 0; bot.vy *= -1; } if (bot.y > ch) { bot.y = ch; bot.vy *= -1; }
 
                 if (Math.random() < 0.1) {
                     s.visitedNodes.push({x: bot.x, y: bot.y, age: 255});
@@ -297,24 +340,22 @@
 
           return (
              <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-80 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+                <aside className="w-full md:w-72 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
                   <section className="space-y-6">
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400">Swarm Protocol</h2>
-                        <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-emerald-500'}`}>{isRunning ? 'Halt 24/7' : 'Resume 24/7'}</button>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400">Protocol</h2>
+                        <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-emerald-500'}`}>{isRunning ? 'Halt' : 'Resume'}</button>
                     </div>
 
                     <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Zeta Numbers Sorted</div>
+                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Zeta Numbers</div>
                         <div className="text-3xl font-mono text-emerald-400">{zetaSorted.toLocaleString()}</div>
-                        <div className="text-[10px] text-slate-500 mt-2">Continuous 24/7 parsing via Smith & Blade logic.</div>
                     </div>
 
                     <div className="space-y-3">
-                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Active Squads</h3>
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-cyan-500/20"><div className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div><div><div className="text-sm font-bold text-slate-200">Group 1 (3 Bots)</div><div className="text-[10px] text-slate-400 uppercase">Directive: Upward Sweep</div></div></div>
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-rose-500/20"><div className="w-3 h-3 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]"></div><div><div className="text-sm font-bold text-slate-200">Group 2 (5 Bots)</div><div className="text-[10px] text-slate-400 uppercase">Directive: Downward Sweep</div></div></div>
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-amber-500/20"><div className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"></div><div><div className="text-sm font-bold text-slate-200">Group 3 (7 Bots)</div><div className="text-[10px] text-slate-400 uppercase">Directive: Radial Expansion</div></div></div>
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-cyan-500/20"><div className="w-3 h-3 rounded-full bg-cyan-400"></div><div><div className="text-sm font-bold text-slate-200">G1 (Upward)</div></div></div>
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-rose-500/20"><div className="w-3 h-3 rounded-full bg-rose-400"></div><div><div className="text-sm font-bold text-slate-200">G2 (Downward)</div></div></div>
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-amber-500/20"><div className="w-3 h-3 rounded-full bg-amber-400"></div><div><div className="text-sm font-bold text-slate-200">G3 (Radial)</div></div></div>
                     </div>
                   </section>
                 </aside>
@@ -326,35 +367,44 @@
         };
 
         // ==========================================
-        // TAB 3: MEDICAL APPLICATION (TISSUE SCANNING)
+        // TAB 3: MEDICAL APPLICATION (SIDE-BY-SIDE)
         // ==========================================
         const MedicalSim = () => {
-          const canvasRef = useRef(null);
+          const canvasStandardRef = useRef(null);
+          const canvasSwarmRef = useRef(null);
           const requestRef = useRef(null);
-          const [anomaliesFound, setAnomaliesFound] = useState(0);
-          const simState = useRef({ bots: [], visitedNodes: [], targets: [], lastSpawn: 0 });
+          
+          const [stats, setStats] = useState({ standard: 0, swarm: 0 });
+          const simState = useRef({ 
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 }
+          });
 
           useEffect(() => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
             const handleResize = () => {
-              const container = canvas.parentElement;
-              if (container) { canvas.width = container.clientWidth; canvas.height = container.clientHeight; }
+              [canvasStandardRef.current, canvasSwarmRef.current].forEach(canvas => {
+                if (canvas && canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
+              });
             };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
 
-            const bots = [];
-            // "Nano-diagnostics / White blood cells"
-            for(let i=0; i<15; i++) bots.push({ x: window.innerWidth/2, y: window.innerHeight/2, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: '#f8fafc', size: 5 });
-            simState.current.bots = bots;
+            const initBots = () => {
+                const arr = [];
+                for(let i=0; i<15; i++) arr.push({ x: window.innerWidth/4, y: window.innerHeight/4, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: '#f8fafc', size: 4 });
+                return arr;
+            };
+            
+            simState.current.standard.bots = initBots();
+            simState.current.swarm.bots = initBots();
+
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
-          const update = () => {
-            const s = simState.current; const canvas = canvasRef.current;
-            if (!canvas) return;
+          const updateEngine = (s, canvas, isSwarm, type) => {
+            if (!canvas) return 0;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
+            let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 2000 && s.targets.length < 10) {
                 s.targets.push({ x: Math.random() * cw, y: Math.random() * ch });
@@ -363,26 +413,32 @@
 
             s.bots.forEach(bot => {
                 let repulseX = 0; let repulseY = 0;
-                s.visitedNodes.forEach(node => {
-                    const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                    if (distSq < 5000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.8; repulseY += (dy/dist) * 0.8; }
-                });
+                
+                // ONLY SWARM USES SMITH & BLADE REPULSION
+                if (isSwarm) {
+                    s.visitedNodes.forEach(node => {
+                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 5000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.8; repulseY += (dy/dist) * 0.8; }
+                    });
+                }
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
                 s.targets.forEach((target, index) => {
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < 150 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 20) { s.targets.splice(index, 1); setAnomaliesFound(prev => prev + 1); }
+                    // Standard has smaller detection radius (blind wandering), Swarm has slightly better networked detection
+                    const detectionRadius = isSwarm ? 150 : 50; 
+                    if (dist < detectionRadius && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
+                    if (dist < 20) { s.targets.splice(index, 1); foundCount++; }
                 });
 
-                bot.vx += repulseX + attractX * 1.2 + (Math.random()-0.5)*0.5; // add organic jitter
+                bot.vx += repulseX + attractX * 1.2 + (Math.random()-0.5)*0.5;
                 bot.vy += repulseY + attractY * 1.2 + (Math.random()-0.5)*0.5;
                 const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
                 if (speed > 2.5) { bot.vx = (bot.vx/speed)*2.5; bot.vy = (bot.vy/speed)*2.5; }
 
                 bot.x += bot.vx; bot.y += bot.vy;
-                if (bot.x < 0 || bot.x > cw) bot.vx *= -1;
-                if (bot.y < 0 || bot.y > ch) bot.vy *= -1;
+                if (bot.x < 0) { bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
+                if (bot.y < 0) { bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
 
                 if (Math.random() < 0.2) {
                     s.visitedNodes.push({x: bot.x, y: bot.y, age: 300});
@@ -392,13 +448,11 @@
 
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            // Organic Tissue Background
-            ctx.fillStyle = 'rgba(76, 5, 25, 0.4)'; 
-            ctx.fillRect(0, 0, cw, ch);
+            ctx.fillStyle = 'rgba(76, 5, 25, 0.4)'; ctx.fillRect(0, 0, cw, ch);
             
             s.visitedNodes.forEach(node => {
                 ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI*2);
-                ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1500})`; ctx.fill(); // Pink fading trail
+                ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1500})`; ctx.fill();
             });
 
             s.targets.forEach(target => {
@@ -408,109 +462,144 @@
 
             s.bots.forEach(bot => {
                 ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2);
-                ctx.fillStyle = bot.color; ctx.shadowBlur = 8; ctx.shadowColor = '#ffffff'; ctx.fill(); ctx.shadowBlur = 0;
+                ctx.fillStyle = bot.color; ctx.fill();
             });
 
-            requestRef.current = requestAnimationFrame(update);
+            return foundCount;
+          };
+
+          const update = () => {
+             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false, 'std');
+             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true, 'swm');
+             
+             if (foundStd > 0 || foundSwm > 0) {
+                 setStats(prev => ({ standard: prev.standard + foundStd, swarm: prev.swarm + foundSwm }));
+             }
+             requestRef.current = requestAnimationFrame(update);
           };
 
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           return (
-             <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-80 bg-rose-950/40 border-b md:border-b-0 md:border-r border-rose-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+             <div className="flex-1 flex flex-col xl:flex-row relative overflow-hidden bg-slate-950">
+                <aside className="w-full xl:w-72 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
                   <section className="space-y-6">
                     <div className="flex items-center gap-2 mb-4">
                         <HeartPulse size={20} className="text-rose-400" />
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-rose-400">Medical Application</h2>
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
                     </div>
-
                     <div className="p-4 bg-rose-900/20 rounded-xl border border-rose-500/30">
-                        <div className="text-sm text-slate-200 font-bold mb-2">Autonomous Diagnostics & Delivery</div>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                            You don't need to understand complex winding numbers to see the benefit. By applying the "Smith & Blade" shared-memory logic, we can deploy bio-compatible nano-swarms into the bloodstream or tissue. 
-                        </p>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                            <strong>Why it matters:</strong> Instead of blindly circulating, these agents communicate where they have already searched (the pink trails). This ensures 100% coverage of an organ without redundant mapping.
+                        <div className="text-sm text-slate-200 font-bold mb-2">A/B Comparison</div>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            Watch the left simulation blindly wander (Standard/Random). Watch the right simulation efficiently map and clear the tissue using shared memory.
                         </p>
                     </div>
-
-                    <div className="p-4 bg-rose-900/40 rounded-xl border border-rose-500/50">
-                        <div className="text-xs text-rose-300 uppercase font-bold mb-1">Pathogens/Anomalies Isolated</div>
-                        <div className="text-3xl font-mono text-white">{anomaliesFound}</div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-700">
+                            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Standard Hits</div>
+                            <div className="text-xl font-mono text-white">{stats.standard}</div>
+                        </div>
+                        <div className="p-3 bg-rose-900/50 rounded-xl border border-rose-500/50">
+                            <div className="text-[10px] text-rose-300 uppercase font-bold mb-1">Swarm Hits</div>
+                            <div className="text-xl font-mono text-white">{stats.swarm}</div>
+                        </div>
                     </div>
                   </section>
                 </aside>
-                <div className="flex-1 min-h-[50vh] bg-[radial-gradient(circle_at_center,_#881337_0%,_#2e020f_100%)] relative">
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
+                
+                <div className="flex-1 flex flex-col md:flex-row min-h-[50vh]">
+                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-rose-900/50">
+                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
+                        <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
+                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard Wandering</span>
+                        </div>
+                    </div>
+                    <div className="flex-1 relative">
+                        <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
+                        <div className="absolute top-4 left-4 bg-rose-900/80 px-3 py-1.5 rounded-lg border border-rose-700 backdrop-blur-sm">
+                            <span className="text-xs font-bold text-rose-300 uppercase tracking-widest">Smith & Blade Swarm</span>
+                        </div>
+                    </div>
                 </div>
              </div>
           );
         };
 
         // ==========================================
-        // TAB 4: TECH/DEEP LEARNING APPLICATION
+        // TAB 4: TECH/DEEP LEARNING (SIDE-BY-SIDE)
         // ==========================================
         const TechSim = () => {
-          const canvasRef = useRef(null);
+          const canvasStandardRef = useRef(null);
+          const canvasSwarmRef = useRef(null);
           const requestRef = useRef(null);
-          const [lossOptimized, setLossOptimized] = useState(0);
-          const simState = useRef({ bots: [], visitedNodes: [], targets: [], lastSpawn: 0 });
+          
+          const [stats, setStats] = useState({ standard: 0, swarm: 0 });
+          const simState = useRef({ 
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 }
+          });
 
           useEffect(() => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
             const handleResize = () => {
-              const container = canvas.parentElement;
-              if (container) { canvas.width = container.clientWidth; canvas.height = container.clientHeight; }
+              [canvasStandardRef.current, canvasSwarmRef.current].forEach(canvas => {
+                if (canvas && canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
+              });
             };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
 
-            const bots = [];
-            // "Network Optimizers / Weight Adjusters"
-            for(let i=0; i<20; i++) bots.push({ x: window.innerWidth/2, y: window.innerHeight/2, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: '#38bdf8', size: 3 });
-            simState.current.bots = bots;
+            const initBots = () => {
+                const arr = [];
+                for(let i=0; i<20; i++) arr.push({ x: window.innerWidth/4, y: window.innerHeight/4, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: '#38bdf8', size: 3 });
+                return arr;
+            };
+            
+            simState.current.standard.bots = initBots();
+            simState.current.swarm.bots = initBots();
+
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
-          const update = () => {
-            const s = simState.current; const canvas = canvasRef.current;
-            if (!canvas) return;
+          const updateEngine = (s, canvas, isSwarm) => {
+            if (!canvas) return 0;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
+            let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                // Snap targets to a grid logic to look "techy"
                 s.targets.push({ x: Math.floor(Math.random() * (cw/40))*40, y: Math.floor(Math.random() * (ch/40))*40 });
                 s.lastSpawn = Date.now();
             }
 
             s.bots.forEach(bot => {
                 let repulseX = 0; let repulseY = 0;
-                s.visitedNodes.forEach(node => {
-                    const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                    if (distSq < 3000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 1.5; repulseY += (dy/dist) * 1.5; }
-                });
+                
+                // ONLY SWARM AVOIDS LOCAL MINIMA (Memory Repulsion)
+                if (isSwarm) {
+                    s.visitedNodes.forEach(node => {
+                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 3000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 1.5; repulseY += (dy/dist) * 1.5; }
+                    });
+                }
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
                 s.targets.forEach((target, index) => {
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < 200 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 15) { s.targets.splice(index, 1); setLossOptimized(prev => prev + 1); }
+                    // Standard easily gets stuck, Swarm dynamically reroutes
+                    const detection = isSwarm ? 200 : 80;
+                    if (dist < detection && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
+                    if (dist < 15) { s.targets.splice(index, 1); foundCount++; }
                 });
 
-                // Move strictly horizontally or vertically for a "routing/grid" feel sometimes
-                if (Math.random() > 0.8) {
-                    if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0;
-                }
+                if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
 
                 bot.vx += repulseX + attractX; bot.vy += repulseY + attractY;
                 const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
                 if (speed > 4) { bot.vx = (bot.vx/speed)*4; bot.vy = (bot.vy/speed)*4; }
 
                 bot.x += bot.vx; bot.y += bot.vy;
-                if (bot.x < 0 || bot.x > cw) bot.vx *= -1;
-                if (bot.y < 0 || bot.y > ch) bot.vy *= -1;
+                if (bot.x < 0) {bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
+                if (bot.y < 0) {bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
 
                 if (Math.random() < 0.3) {
                     s.visitedNodes.push({x: bot.x, y: bot.y, age: 100});
@@ -520,11 +609,8 @@
 
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            // Cyber Grid Background
-            ctx.fillStyle = 'rgba(2, 6, 23, 0.5)'; 
-            ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)';
-            ctx.lineWidth = 1;
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.5)'; ctx.fillRect(0, 0, cw, ch);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
             for(let i=0; i<cw; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, ch); ctx.stroke(); }
             for(let i=0; i<ch; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(cw, i); ctx.stroke(); }
 
@@ -539,65 +625,81 @@
                 ctx.fillStyle = 'rgba(244, 63, 94, 0.2)'; ctx.fill();
             });
 
-            // Draw angular connections between tech bots
-            ctx.lineWidth = 0.5;
-            for(let i=0; i<s.bots.length; i++) {
-                for(let j=i+1; j<s.bots.length; j++) {
-                    const b1 = s.bots[i]; const b2 = s.bots[j];
-                    const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                    if (dx*dx + dy*dy < 10000) { 
-                        ctx.beginPath(); ctx.moveTo(b1.x, b1.y); 
-                        ctx.lineTo(b1.x, b2.y); // Angular Manhattan line
-                        ctx.lineTo(b2.x, b2.y); 
-                        ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.stroke(); 
+            if (isSwarm) {
+                ctx.lineWidth = 0.5;
+                for(let i=0; i<s.bots.length; i++) {
+                    for(let j=i+1; j<s.bots.length; j++) {
+                        const b1 = s.bots[i]; const b2 = s.bots[j];
+                        const dx = b1.x - b2.x; const dy = b1.y - b2.y;
+                        if (dx*dx + dy*dy < 10000) { 
+                            ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b1.x, b2.y); ctx.lineTo(b2.x, b2.y); 
+                            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.stroke(); 
+                        }
                     }
                 }
             }
 
-            s.bots.forEach(bot => {
-                ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2);
-                ctx.fillStyle = bot.color; ctx.fill();
-            });
+            s.bots.forEach(bot => { ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2); ctx.fillStyle = bot.color; ctx.fill(); });
+            
+            return foundCount;
+          };
 
-            requestRef.current = requestAnimationFrame(update);
+          const update = () => {
+             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false);
+             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
+             if (foundStd > 0 || foundSwm > 0) setStats(prev => ({ standard: prev.standard + foundStd, swarm: prev.swarm + foundSwm }));
+             requestRef.current = requestAnimationFrame(update);
           };
 
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           return (
-             <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-80 bg-slate-900/80 border-b md:border-b-0 md:border-r border-sky-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+             <div className="flex-1 flex flex-col xl:flex-row relative overflow-hidden bg-slate-950">
+                <aside className="w-full xl:w-72 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
                   <section className="space-y-6">
                     <div className="flex items-center gap-2 mb-4">
                         <CpuIcon size={20} className="text-sky-400" />
                         <h2 className="text-sm font-bold uppercase tracking-wider text-sky-400">Deep Learning App</h2>
                     </div>
-
                     <div className="p-4 bg-slate-800/80 rounded-xl border border-sky-500/30">
-                        <div className="text-sm text-slate-200 font-bold mb-2">Loss Landscape Optimization</div>
+                        <div className="text-sm text-slate-200 font-bold mb-2">A/B Testing</div>
                         <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                            Training neural networks requires searching massive, multi-dimensional "landscapes" for the lowest possible error rate (global minima). 
-                        </p>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                            <strong>Why it matters:</strong> Standard AI often gets stuck in "local minima" (dead ends). By treating parameter weights as a Swarm that maps "high loss" areas and repels away from them via holographic folding, we train networks faster and cheaper, automating anomaly detection.
+                            Left: Standard algorithms frequently get trapped in "local minima" (loops). Right: Holographic Swarm maps failures and actively repels, finding the "global minima" much faster.
                         </p>
                     </div>
-
-                    <div className="p-4 bg-sky-900/20 rounded-xl border border-sky-500/50">
-                        <div className="text-xs text-sky-300 uppercase font-bold mb-1">Global Minima Reached</div>
-                        <div className="text-3xl font-mono text-white">{lossOptimized}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-700">
+                            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Standard GD</div>
+                            <div className="text-xl font-mono text-white">{stats.standard}</div>
+                        </div>
+                        <div className="p-3 bg-sky-900/50 rounded-xl border border-sky-500/50">
+                            <div className="text-[10px] text-sky-300 uppercase font-bold mb-1">Holo Swarm</div>
+                            <div className="text-xl font-mono text-white">{stats.swarm}</div>
+                        </div>
                     </div>
                   </section>
                 </aside>
-                <div className="flex-1 min-h-[50vh] bg-slate-950 relative">
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
+                
+                <div className="flex-1 flex flex-col md:flex-row min-h-[50vh]">
+                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800">
+                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
+                        <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
+                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard Descend</span>
+                        </div>
+                    </div>
+                    <div className="flex-1 relative">
+                        <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
+                        <div className="absolute top-4 left-4 bg-sky-900/80 px-3 py-1.5 rounded-lg border border-sky-700 backdrop-blur-sm">
+                            <span className="text-xs font-bold text-sky-300 uppercase tracking-widest">Swarm Optimization</span>
+                        </div>
+                    </div>
                 </div>
              </div>
           );
         };
 
         // ==========================================
-        // MAIN APP CONTAINER (TAB LOGIC)
+        // MAIN APP CONTAINER
         // ==========================================
         const App = () => {
           const [activeTab, setActiveTab] = useState(1);
@@ -615,7 +717,6 @@
                   </div>
                 </div>
 
-                {/* Tab Navigation - Scrollable on Mobile */}
                 <div className="flex w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
                     <div className="flex bg-slate-800/50 p-1 rounded-xl min-w-max">
                         <button onClick={() => setActiveTab(1)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 1 ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
@@ -625,10 +726,10 @@
                             <NetworkIcon size={16} /> Zeta Swarm
                         </button>
                         <button onClick={() => setActiveTab(3)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 3 ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <HeartPulse size={16} /> Medicine
+                            <HeartPulse size={16} /> Medicine (A/B)
                         </button>
                         <button onClick={() => setActiveTab(4)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 4 ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <CpuIcon size={16} /> Tech / DL
+                            <CpuIcon size={16} /> Tech / DL (A/B)
                         </button>
                     </div>
                 </div>
@@ -648,7 +749,6 @@
         root.render(<App />);
     </script>
     <style>
-        /* Hide scrollbar for the tab menu on mobile */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
