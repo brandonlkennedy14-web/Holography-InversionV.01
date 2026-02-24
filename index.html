@@ -511,6 +511,15 @@
 
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
+          const handleReset = () => {
+             simState.current.standard.hits = 0;
+             simState.current.swarm.hits = 0;
+             simState.current.standard.targets = [];
+             simState.current.swarm.targets = [];
+             setStats({ standard: 0, swarm: 0 });
+             localStorage.setItem('genesis_medical', JSON.stringify({ standard: 0, swarm: 0 }));
+          };
+
           return (
              <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
                 <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[30%] md:max-h-none">
@@ -529,6 +538,9 @@
                             <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
+                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-rose-800 hover:bg-rose-800/50 text-rose-300 font-semibold text-xs transition-colors">
+                        <RefreshCw size={12} /> Reset A/B Stats
+                    </button>
                   </section>
                 </aside>
                 
@@ -678,9 +690,18 @@
 
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
+          const handleReset = () => {
+             simState.current.standard.hits = 0;
+             simState.current.swarm.hits = 0;
+             simState.current.standard.targets = [];
+             simState.current.swarm.targets = [];
+             setStats({ standard: 0, swarm: 0 });
+             localStorage.setItem('genesis_tech', JSON.stringify({ standard: 0, swarm: 0 }));
+          };
+
           return (
-             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/80 border-b md:border-b-0 md:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[30%] md:max-h-none">
+             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[30%] md:max-h-none">
                   <section className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                         <CpuIcon size={18} className="text-sky-400" />
@@ -696,6 +717,9 @@
                             <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
+                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-sky-800 hover:bg-sky-800/50 text-sky-300 font-semibold text-xs transition-colors">
+                        <RefreshCw size={12} /> Reset A/B Stats
+                    </button>
                   </section>
                 </aside>
                 
