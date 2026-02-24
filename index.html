@@ -63,11 +63,7 @@
                 setWindingNumber(stateRef.current.winding);
                 setCornerHits(stateRef.current.corners);
                 setConfigsRegistered(stateRef.current.configs);
-                localStorage.setItem('genesis_billiard', JSON.stringify({
-                    winding: stateRef.current.winding,
-                    corners: stateRef.current.corners,
-                    configs: stateRef.current.configs
-                }));
+                localStorage.setItem('genesis_billiard', JSON.stringify({ winding: stateRef.current.winding, corners: stateRef.current.corners, configs: stateRef.current.configs }));
             }, 500);
             return () => clearInterval(syncInterval);
           }, []);
@@ -76,10 +72,9 @@
             const canvas = canvasRef.current;
             if (!canvas) return;
             const handleResize = () => {
-              const container = canvas.parentElement;
-              if (container) { 
-                canvas.width = container.clientWidth; 
-                canvas.height = container.clientHeight; 
+              if (canvas.parentElement) { 
+                canvas.width = canvas.parentElement.clientWidth; 
+                canvas.height = canvas.parentElement.clientHeight; 
                 if (!stateRef.current.pos.x) {
                   stateRef.current.pos = { x: canvas.width/2, y: canvas.height/2 };
                 }
@@ -142,16 +137,14 @@
             ctx.clearRect(0, 0, cw, ch);
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
+            ctx.lineWidth = 1; ctx.beginPath();
             for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
             for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
             ctx.stroke();
 
             if (showDynamicGrid) {
               ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; 
-              ctx.lineWidth = 1;
-              ctx.beginPath();
+              ctx.lineWidth = 1; ctx.beginPath();
               const phaseOffset = Math.sin(s.gridPhase) * 20;
               for(let i = -halfSize; i <= halfSize; i+=30) {
                   let x = cx + i + phaseOffset;
@@ -185,7 +178,7 @@
             }
 
             ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#38bdf8'; ctx.shadowBlur = 10; ctx.shadowColor = '#38bdf8'; ctx.fill(); ctx.shadowBlur = 0;
+            ctx.fillStyle = '#38bdf8'; ctx.fill(); 
 
             const currentInv = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
             ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 5, 0, Math.PI * 2);
@@ -199,13 +192,6 @@
             else if (requestRef.current) cancelAnimationFrame(requestRef.current);
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
           }, [isRunning, speed, inversionRadius, showDynamicGrid]);
-
-          const handleReset = () => {
-             stateRef.current.stdPath = []; stateRef.current.invPath = []; 
-             stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0;
-             setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0);
-             localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 }));
-          };
 
           return (
             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
@@ -230,7 +216,7 @@
                           <span className="text-xs font-medium">Dual Geometry Mesh</span>
                           <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" />
                         </label>
-                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
+                        <button onClick={() => { stateRef.current.stdPath = []; stateRef.current.invPath = []; stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0; setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0); localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 })); }} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
                           <RefreshCw size={12} /> Reset Data
                         </button>
                     </div>
@@ -258,7 +244,7 @@
           const requestRef = useRef(null);
           const [zetaSorted, setZetaSorted] = useState(0);
           const [isRunning, setIsRunning] = useState(true);
-          const simState = useRef({ bots: [], visitedNodes: [], zetaTargets: [], lastSpawn: 0, zetaCount: 0 });
+          const simState = useRef({ bots: [], visitedNodes: [], zetaTargets: [], lastSpawn: 0, zetaCount: 0, initialized: false });
 
           useEffect(() => {
             const saved = JSON.parse(localStorage.getItem('genesis_zeta') || '{}');
@@ -271,17 +257,9 @@
           }, []);
 
           useEffect(() => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const handleResize = () => { if (canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; } };
+            const handleResize = () => { if (canvasRef.current && canvasRef.current.parentElement) { canvasRef.current.width = canvasRef.current.parentElement.clientWidth; canvasRef.current.height = canvasRef.current.parentElement.clientHeight; } };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
-
-            const bots = [];
-            for(let i=0; i<3; i++) bots.push({ id: `g1_${i}`, group: 1, x: window.innerWidth/2, y: window.innerHeight - 100, vx: (Math.random()-0.5)*2, vy: -2, color: '#22d3ee', size: 4 });
-            for(let i=0; i<5; i++) bots.push({ id: `g2_${i}`, group: 2, x: window.innerWidth/2, y: 100, vx: (Math.random()-0.5)*2, vy: 2, color: '#fb7185', size: 3 });
-            for(let i=0; i<7; i++) { const angle = (i / 7) * Math.PI * 2; bots.push({ id: `g3_${i}`, group: 3, x: window.innerWidth/2, y: window.innerHeight/2, vx: Math.cos(angle)*1.5, vy: Math.sin(angle)*1.5, color: '#fbbf24', size: 3 }); }
-            simState.current.bots = bots;
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
@@ -290,47 +268,56 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
-            if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 30) {
-                s.zetaTargets.push({ x: Math.random() * cw, y: Math.random() * ch, consumed: false });
-                s.lastSpawn = Date.now();
+            // Strict Initialization inside the loop ensures bots only spawn when canvas exists
+            if (!s.initialized && cw > 0 && ch > 0) {
+                s.bots = [];
+                for(let i=0; i<7; i++) { 
+                    const angle = (i/7) * Math.PI * 2;
+                    s.bots.push({ group: 3, x: cw/2, y: ch/2, vx: Math.cos(angle)*3, vy: Math.sin(angle)*3, color: '#22d3ee', size: 4 }); 
+                }
+                s.initialized = true;
             }
 
-            s.bots.forEach(bot => {
-                let repulseX = 0; let repulseY = 0;
-                s.visitedNodes.forEach(node => {
-                    const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                    if (distSq < 4000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.5; repulseY += (dy/dist) * 0.5; }
-                });
-
-                let attractX = 0; let attractY = 0; let minDist = Infinity;
-                s.zetaTargets.forEach((target) => {
-                    if (target.consumed) return; 
-                    const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < 120 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 25) { target.consumed = true; s.zetaCount += 1; } 
-                });
-
-                let dirX = 0; let dirY = 0;
-                if (bot.group === 1) dirY = -0.5;
-                if (bot.group === 2) dirY = 0.5;
-                if (bot.group === 3) { dirX = (bot.x - cw/2) > 0 ? 0.2 : -0.2; dirY = (bot.y - ch/2) > 0 ? 0.2 : -0.2; }
-
-                bot.vx += repulseX + attractX * 0.6 + dirX; bot.vy += repulseY + attractY * 0.6 + dirY;
-                const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                if (speed > 3.5) { bot.vx = (bot.vx/speed)*3.5; bot.vy = (bot.vy/speed)*3.5; }
-
-                bot.x += bot.vx; bot.y += bot.vy;
-                if (bot.x < 0) { bot.x = 0; bot.vx *= -1; } if (bot.x > cw) { bot.x = cw; bot.vx *= -1; }
-                if (bot.y < 0) { bot.y = 0; bot.vy *= -1; } if (bot.y > ch) { bot.y = ch; bot.vy *= -1; }
-
-                if (Math.random() < 0.15) {
-                    s.visitedNodes.push({x: bot.x, y: bot.y, age: 255});
-                    if (s.visitedNodes.length > 250) s.visitedNodes.shift();
+            if (s.initialized) {
+                if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 25) {
+                    s.zetaTargets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false });
+                    s.lastSpawn = Date.now();
                 }
-            });
 
-            s.zetaTargets = s.zetaTargets.filter(t => !t.consumed);
-            s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
+                s.bots.forEach(bot => {
+                    let repulseX = 0; let repulseY = 0;
+                    s.visitedNodes.forEach(node => {
+                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.3; repulseY += (dy/dist) * 0.3; }
+                    });
+
+                    let attractX = 0; let attractY = 0; let minDist = Infinity;
+                    s.zetaTargets.forEach((target) => {
+                        if (target.consumed) return; 
+                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 1.5; attractY = (dy/dist) * 1.5; }
+                        if (distSq < 400) { target.consumed = true; s.zetaCount += 1; } // 20px hit radius
+                    });
+
+                    // Keeps them off the exact edges
+                    if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
+                    if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
+
+                    bot.vx += repulseX + attractX + (Math.random()-0.5)*0.5; 
+                    bot.vy += repulseY + attractY + (Math.random()-0.5)*0.5;
+                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
+                    if (speed > 4.5) { bot.vx = (bot.vx/speed)*4.5; bot.vy = (bot.vy/speed)*4.5; }
+
+                    bot.x += bot.vx; bot.y += bot.vy;
+                    if (bot.x < 0) { bot.x = 0; bot.vx *= -1; } if (bot.x > cw) { bot.x = cw; bot.vx *= -1; }
+                    if (bot.y < 0) { bot.y = 0; bot.vy *= -1; } if (bot.y > ch) { bot.y = ch; bot.vy *= -1; }
+
+                    if (Math.random() < 0.15) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 150}); if (s.visitedNodes.length > 200) s.visitedNodes.shift(); }
+                });
+
+                s.zetaTargets = s.zetaTargets.filter(t => !t.consumed);
+                s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
+            }
 
             ctx.fillStyle = 'rgba(15, 23, 42, 0.4)'; ctx.fillRect(0, 0, cw, ch);
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; ctx.lineWidth = 1; ctx.beginPath();
@@ -338,11 +325,8 @@
             for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
             ctx.stroke();
 
-            s.visitedNodes.forEach(node => {
-                ctx.beginPath(); ctx.arc(node.x, node.y, 2, 0, Math.PI*2);
-                ctx.fillStyle = `rgba(255, 255, 255, ${node.age/1000})`; ctx.fill();
-            });
-
+            s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 2, 0, Math.PI*2); ctx.fillStyle = `rgba(255, 255, 255, ${node.age/1000})`; ctx.fill(); });
+            
             s.zetaTargets.forEach(target => {
                 ctx.beginPath(); ctx.rect(target.x-5, target.y-5, 10, 10);
                 ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 2; ctx.stroke();
@@ -353,18 +337,12 @@
             for(let i=0; i<s.bots.length; i++) {
                 for(let j=i+1; j<s.bots.length; j++) {
                     const b1 = s.bots[i]; const b2 = s.bots[j];
-                    if (b1.group === b2.group) {
-                        const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                        if (dx*dx + dy*dy < 20000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = b1.color + '60'; ctx.stroke(); }
-                    }
+                    const dx = b1.x - b2.x; const dy = b1.y - b2.y;
+                    if (dx*dx + dy*dy < 20000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = '#22d3ee50'; ctx.stroke(); }
                 }
             }
 
-            s.bots.forEach(bot => {
-                ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2);
-                ctx.fillStyle = bot.color; ctx.shadowBlur = 10; ctx.shadowColor = bot.color; ctx.fill(); ctx.shadowBlur = 0;
-            });
-
+            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.fill(); });
             if (isRunning) requestRef.current = requestAnimationFrame(update);
           };
 
@@ -389,9 +367,10 @@
                     </div>
 
                     <div className="space-y-2">
-                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-cyan-500/20"><div className="w-3 h-3 rounded-full bg-cyan-400"></div><div><div className="text-xs font-bold text-slate-200">G1 (Upward)</div></div></div>
-                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-rose-500/20"><div className="w-3 h-3 rounded-full bg-rose-400"></div><div><div className="text-xs font-bold text-slate-200">G2 (Downward)</div></div></div>
-                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-amber-500/20"><div className="w-3 h-3 rounded-full bg-amber-400"></div><div><div className="text-xs font-bold text-slate-200">G3 (Radial)</div></div></div>
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/40 rounded-lg border border-cyan-500/20">
+                            <div className="w-3 h-3 rounded-full bg-cyan-400 animate-pulse"></div>
+                            <div><div className="text-xs font-bold text-slate-200">Swarm Active (7 Bots)</div><div className="text-[10px] text-slate-400">High-efficiency hunting</div></div>
+                        </div>
                     </div>
                   </section>
                 </aside>
@@ -412,21 +391,17 @@
           
           const [stats, setStats] = useState({ standard: 0, swarm: 0 });
           const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 }
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, init: false },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, init: false }
           });
 
           useEffect(() => {
             const saved = JSON.parse(localStorage.getItem('genesis_medical') || '{}');
             simState.current.standard.hits = saved.standard || 0;
             simState.current.swarm.hits = saved.swarm || 0;
-            
             const syncInterval = setInterval(() => {
                 setStats({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits });
-                localStorage.setItem('genesis_medical', JSON.stringify({ 
-                    standard: simState.current.standard.hits, 
-                    swarm: simState.current.swarm.hits 
-                }));
+                localStorage.setItem('genesis_medical', JSON.stringify({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits }));
             }, 500);
             return () => clearInterval(syncInterval);
           }, []);
@@ -439,16 +414,6 @@
             };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
-
-            const initBots = () => {
-                const arr = [];
-                // Initialize safely in relative bounds so they don't get trapped offscreen
-                for(let i=0; i<15; i++) arr.push({ x: 50 + Math.random()*50, y: 50 + Math.random()*50, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: '#f8fafc', size: 4 });
-                return arr;
-            };
-            simState.current.standard.bots = initBots();
-            simState.current.swarm.bots = initBots();
-
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
@@ -456,8 +421,15 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
-            if (Date.now() - s.lastSpawn > 2000 && s.targets.length < 10) {
-                s.targets.push({ x: Math.random() * cw, y: Math.random() * ch, consumed: false });
+            if (!s.init && cw > 0 && ch > 0) {
+                s.bots = [];
+                for(let i=0; i<15; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#fb923c', size: 4 });
+                s.init = true;
+            }
+            if (!s.init) return;
+
+            if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
+                s.targets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false });
                 s.lastSpawn = Date.now();
             }
 
@@ -465,91 +437,70 @@
                 let repulseX = 0; let repulseY = 0;
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
                 
-                // ONLY SWARM gets memory and active target hunting
                 if (isSwarm) {
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 5000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.8; repulseY += (dy/dist) * 0.8; }
+                        if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.4; repulseY += (dy/dist) * 0.4; }
                     });
                     
                     s.targets.forEach((target) => {
                         if (target.consumed) return;
-                        const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                        if (dist < 150 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
+                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 60000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.0; attractY = (dy/dist) * 2.0; }
                     });
                 }
 
-                // Check collision for both (Standard bumps into them by chance)
                 s.targets.forEach((target) => {
                     if (target.consumed) return;
-                    const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < 25) { target.consumed = true; s.hits += 1; }
+                    const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
+                    if (distSq < 400) { target.consumed = true; s.hits += 1; }
                 });
 
+                if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
+                if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
+
                 if (isSwarm) {
-                    bot.vx += repulseX + attractX * 1.2 + (Math.random()-0.5)*0.5;
-                    bot.vy += repulseY + attractY * 1.2 + (Math.random()-0.5)*0.5;
+                    bot.vx += repulseX + attractX + (Math.random()-0.5)*0.5;
+                    bot.vy += repulseY + attractY + (Math.random()-0.5)*0.5;
+                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
+                    if (speed > 4.5) { bot.vx = (bot.vx/speed)*4.5; bot.vy = (bot.vy/speed)*4.5; }
                 } else {
-                    // TRUE REGULAR CHAOS: Standard completely random walk without memory/goals
+                    // SEVERE NERF to Standard: Pure aimless brownian motion
                     bot.vx += (Math.random()-0.5) * 1.5;
                     bot.vy += (Math.random()-0.5) * 1.5;
+                    bot.vx *= 0.95; // Add friction so they don't blast around the screen
+                    bot.vy *= 0.95; 
                 }
-
-                const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                if (speed > 2.5) { bot.vx = (bot.vx/speed)*2.5; bot.vy = (bot.vy/speed)*2.5; }
 
                 bot.x += bot.vx; bot.y += bot.vy;
                 if (bot.x < 0) { bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
                 if (bot.y < 0) { bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
 
-                // ONLY SWARM writes to the memory map
-                if (isSwarm && Math.random() < 0.2) {
-                    s.visitedNodes.push({x: bot.x, y: bot.y, age: 300});
-                    if (s.visitedNodes.length > 300) s.visitedNodes.shift();
-                }
+                if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 150}); if (s.visitedNodes.length > 200) s.visitedNodes.shift(); }
             });
 
             s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            ctx.fillStyle = isSwarm ? 'rgba(76, 5, 25, 0.4)' : 'rgba(67, 10, 10, 0.4)'; 
-            ctx.fillRect(0, 0, cw, ch);
-            
-            ctx.strokeStyle = 'rgba(244, 114, 182, 0.1)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
+            ctx.fillStyle = isSwarm ? 'rgba(76, 5, 25, 0.4)' : 'rgba(67, 10, 10, 0.4)'; ctx.fillRect(0, 0, cw, ch);
+            ctx.strokeStyle = 'rgba(244, 114, 182, 0.1)'; ctx.lineWidth = 1; ctx.beginPath();
             for(let x=0; x<cw; x+=60) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
             for(let y=0; y<ch; y+=60) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
             ctx.stroke();
 
-            // ONLY SWARM draws the memory trails visually
             if (isSwarm) {
-                s.visitedNodes.forEach(node => {
-                    ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI*2);
-                    ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1500})`; ctx.fill();
-                });
-            }
-
-            s.targets.forEach(target => {
-                ctx.beginPath(); ctx.arc(target.x, target.y, 8, 0, Math.PI*2);
-                ctx.fillStyle = '#fef08a'; ctx.shadowBlur = 15; ctx.shadowColor = '#eab308'; ctx.fill(); ctx.shadowBlur = 0;
-            });
-
-            if (isSwarm) {
+                s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI*2); ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1000})`; ctx.fill(); });
                 ctx.lineWidth = 0.5;
                 for(let i=0; i<s.bots.length; i++) {
                     for(let j=i+1; j<s.bots.length; j++) {
-                        const b1 = s.bots[i]; const b2 = s.bots[j];
-                        const dx = b1.x - b2.x; const dy = b1.y - b2.y;
+                        const b1 = s.bots[i]; const b2 = s.bots[j]; const dx = b1.x - b2.x; const dy = b1.y - b2.y;
                         if (dx*dx + dy*dy < 10000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = 'rgba(248, 113, 113, 0.4)'; ctx.stroke(); }
                     }
                 }
             }
 
-            s.bots.forEach(bot => {
-                ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2);
-                ctx.fillStyle = bot.color; ctx.fill();
-            });
+            s.targets.forEach(target => { ctx.beginPath(); ctx.arc(target.x, target.y, 6, 0, Math.PI*2); ctx.fillStyle = '#fef08a'; ctx.fill(); });
+            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.fill(); });
           };
 
           const update = () => {
@@ -568,43 +519,31 @@
                         <HeartPulse size={18} className="text-rose-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
                     </div>
-                    <div className="p-3 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Watch Method 1 perform pure random chaos. Watch Method 2 efficiently map and clear the tissue using shared memory.
-                        </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
                         <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
                             <div className="text-[9px] text-orange-300 uppercase font-bold mb-1">M1: Random Chaos</div>
-                            <div className="text-lg font-mono text-white">{stats.standard}</div>
+                            <div className="text-xl font-mono text-white">{stats.standard}</div>
                         </div>
                         <div className="p-3 bg-emerald-900/40 rounded-xl border border-emerald-500/50 shadow-inner">
                             <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1">M2: Holo Swarm</div>
-                            <div className="text-lg font-mono text-white">{stats.swarm}</div>
+                            <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
                   </section>
                 </aside>
                 
-                {/* ALWAYS SIDE-BY-SIDE ON MOBILE AND DESKTOP */}
-                <div className="flex-1 flex flex-row relative min-h-0">
-                    <div className="flex-1 relative min-h-0 border-r border-rose-900/50 overflow-hidden">
+                {/* 50/50 Flex Split - Fixed layout truncation */}
+                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
+                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-rose-900/50 overflow-hidden">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md shadow-lg pointer-events-none">
-                            <span className="text-[8px] md:text-xs font-bold text-orange-400 uppercase tracking-wider flex flex-col">
-                                <span className="text-[8px] text-orange-500/70">Method 1</span>
-                                Pure Chaos
-                            </span>
+                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none">
+                            <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Pure Chaos</span>
                         </div>
                     </div>
-                    <div className="flex-1 relative min-h-0 overflow-hidden">
+                    <div className="flex-1 relative overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md shadow-lg pointer-events-none">
-                            <span className="text-[8px] md:text-xs font-bold text-emerald-400 uppercase tracking-wider flex flex-col">
-                                <span className="text-[8px] text-emerald-500/70">Method 2</span>
-                                Smith/Blade
-                            </span>
+                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none">
+                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Smith/Blade</span>
                         </div>
                     </div>
                 </div>
@@ -622,21 +561,17 @@
           
           const [stats, setStats] = useState({ standard: 0, swarm: 0 });
           const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 }
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, init: false },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, init: false }
           });
 
           useEffect(() => {
             const saved = JSON.parse(localStorage.getItem('genesis_tech') || '{}');
             simState.current.standard.hits = saved.standard || 0;
             simState.current.swarm.hits = saved.swarm || 0;
-            
             const syncInterval = setInterval(() => {
                 setStats({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits });
-                localStorage.setItem('genesis_tech', JSON.stringify({ 
-                    standard: simState.current.standard.hits, 
-                    swarm: simState.current.swarm.hits 
-                }));
+                localStorage.setItem('genesis_tech', JSON.stringify({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits }));
             }, 500);
             return () => clearInterval(syncInterval);
           }, []);
@@ -649,16 +584,6 @@
             };
             window.addEventListener('resize', handleResize);
             setTimeout(handleResize, 100);
-
-            const initBots = () => {
-                const arr = [];
-                for(let i=0; i<20; i++) arr.push({ x: 50 + Math.random()*50, y: 50 + Math.random()*50, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: '#38bdf8', size: 3 });
-                return arr;
-            };
-            
-            simState.current.standard.bots = initBots();
-            simState.current.swarm.bots = initBots();
-
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
@@ -666,88 +591,82 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
+            if (!s.init && cw > 0 && ch > 0) {
+                s.bots = [];
+                for(let i=0; i<20; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#38bdf8', size: 3 });
+                s.init = true;
+            }
+            if (!s.init) return;
+
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                s.targets.push({ x: Math.floor(Math.random() * (cw/40))*40, y: Math.floor(Math.random() * (ch/40))*40, consumed: false });
+                s.targets.push({ x: 20 + Math.floor(Math.random()*(cw-40)/40)*40, y: 20 + Math.floor(Math.random()*(ch-40)/40)*40, consumed: false });
                 s.lastSpawn = Date.now();
             }
 
             s.bots.forEach(bot => {
-                let repulseX = 0; let repulseY = 0;
-                let attractX = 0; let attractY = 0; let minDist = Infinity;
+                let repulseX = 0; let repulseY = 0; let attractX = 0; let attractY = 0; let minDist = Infinity;
                 
-                // ONLY SWARM uses active memory repulsion
                 if (isSwarm) {
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 3000) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 1.5; repulseY += (dy/dist) * 1.5; }
+                        if (distSq < 3000 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.4; repulseY += (dy/dist) * 0.4; }
+                    });
+                    
+                    s.targets.forEach((target) => {
+                        if (target.consumed) return;
+                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.0; attractY = (dy/dist) * 2.0; }
                     });
                 }
 
                 s.targets.forEach((target) => {
                     if (target.consumed) return;
-                    const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    // Standard has tiny detection, it just hits near targets without global map
-                    const detection = isSwarm ? 200 : 80;
-                    if (dist < detection && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 25) { target.consumed = true; s.hits += 1; }
+                    const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
+                    if (distSq < 400) { target.consumed = true; s.hits += 1; }
                 });
 
-                if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
+                if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
+                if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
 
-                bot.vx += repulseX + attractX; bot.vy += repulseY + attractY;
-                const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                if (speed > 4) { bot.vx = (bot.vx/speed)*4; bot.vy = (bot.vy/speed)*4; }
+                if (isSwarm) {
+                    if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
+                    bot.vx += repulseX + attractX; bot.vy += repulseY + attractY;
+                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
+                    if (speed > 5) { bot.vx = (bot.vx/speed)*5; bot.vy = (bot.vy/speed)*5; }
+                } else {
+                    // SEVERE NERF: Standard actively gets stuck in local clusters/minima
+                    bot.vx += (Math.random()-0.5) * 2.5; bot.vy += (Math.random()-0.5) * 2.5;
+                    bot.vx *= 0.85; bot.vy *= 0.85; // High friction makes them pool up
+                }
 
                 bot.x += bot.vx; bot.y += bot.vy;
                 if (bot.x < 0) {bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
                 if (bot.y < 0) {bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
 
-                // ONLY SWARM populates the memory map
-                if (isSwarm && Math.random() < 0.3) {
-                    s.visitedNodes.push({x: bot.x, y: bot.y, age: 100});
-                    if (s.visitedNodes.length > 150) s.visitedNodes.shift();
-                }
+                if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 100}); if (s.visitedNodes.length > 150) s.visitedNodes.shift(); }
             });
 
             s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            ctx.fillStyle = isSwarm ? 'rgba(2, 6, 23, 0.5)' : 'rgba(15, 5, 5, 0.5)'; 
-            ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 1;
-            ctx.beginPath();
+            ctx.fillStyle = isSwarm ? 'rgba(2, 6, 23, 0.5)' : 'rgba(15, 5, 5, 0.5)'; ctx.fillRect(0, 0, cw, ch);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 1; ctx.beginPath();
             for(let i=0; i<cw; i+=40) { ctx.moveTo(i, 0); ctx.lineTo(i, ch); }
             for(let i=0; i<ch; i+=40) { ctx.moveTo(0, i); ctx.lineTo(cw, i); }
             ctx.stroke();
 
-            // ONLY SWARM draws the memory dots
             if (isSwarm) {
-                s.visitedNodes.forEach(node => {
-                    ctx.beginPath(); ctx.rect(node.x-2, node.y-2, 4, 4);
-                    ctx.fillStyle = `rgba(56, 189, 248, ${node.age/200})`; ctx.fill(); 
-                });
-            }
-
-            s.targets.forEach(target => {
-                ctx.beginPath(); ctx.arc(target.x, target.y, 6, 0, Math.PI*2);
-                ctx.strokeStyle = '#f43f5e'; ctx.lineWidth = 2; ctx.stroke();
-                ctx.fillStyle = 'rgba(244, 63, 94, 0.2)'; ctx.fill();
-            });
-
-            if (isSwarm) {
+                s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.rect(node.x-2, node.y-2, 4, 4); ctx.fillStyle = `rgba(56, 189, 248, ${node.age/200})`; ctx.fill(); });
                 ctx.lineWidth = 0.5;
                 for(let i=0; i<s.bots.length; i++) {
                     for(let j=i+1; j<s.bots.length; j++) {
-                        const b1 = s.bots[i]; const b2 = s.bots[j];
-                        const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                        if (dx*dx + dy*dy < 10000) { 
-                            ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b1.x, b2.y); ctx.lineTo(b2.x, b2.y); 
-                            ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.stroke(); 
-                        }
+                        const b1 = s.bots[i]; const b2 = s.bots[j]; const dx = b1.x - b2.x; const dy = b1.y - b2.y;
+                        if (dx*dx + dy*dy < 10000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b1.x, b2.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.stroke(); }
                     }
                 }
             }
 
+            s.targets.forEach(target => { ctx.beginPath(); ctx.arc(target.x, target.y, 6, 0, Math.PI*2); ctx.fillStyle = 'rgba(244, 63, 94, 0.6)'; ctx.fill(); });
             s.bots.forEach(bot => { ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2); ctx.fillStyle = bot.color; ctx.fill(); });
           };
 
@@ -760,52 +679,38 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           return (
-             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[30%] md:max-h-none">
+             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/80 border-b md:border-b-0 md:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[30%] md:max-h-none">
                   <section className="space-y-4">
                     <div className="flex items-center gap-2 mb-2">
                         <CpuIcon size={18} className="text-sky-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Deep Learning</h2>
                     </div>
-                    <div className="p-3 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
-                        <p className="text-[10px] text-slate-400 leading-relaxed mb-1">
-                            Left: Algorithms get trapped in "local minima" and cluster up. 
-                        </p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Right: Holographic Swarm dynamically repels away from dead ends.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
                         <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
                             <div className="text-[9px] text-orange-300 uppercase font-bold mb-1">M1: Blind GD</div>
-                            <div className="text-lg font-mono text-white">{stats.standard}</div>
+                            <div className="text-xl font-mono text-white">{stats.standard}</div>
                         </div>
                         <div className="p-3 bg-emerald-900/40 rounded-xl border border-emerald-500/50 shadow-inner">
                             <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1">M2: Holo Swarm</div>
-                            <div className="text-lg font-mono text-white">{stats.swarm}</div>
+                            <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
                   </section>
                 </aside>
                 
-                {/* ALWAYS SIDE-BY-SIDE ON MOBILE AND DESKTOP */}
-                <div className="flex-1 flex flex-row relative min-h-0">
-                    <div className="flex-1 relative min-h-0 border-r border-slate-800 overflow-hidden">
+                {/* 50/50 Flex Split - Fixed layout truncation */}
+                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
+                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800 overflow-hidden">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#0f0505]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md shadow-lg pointer-events-none">
-                            <span className="text-[8px] md:text-xs font-bold text-orange-400 uppercase tracking-wider flex flex-col">
-                                <span className="text-[8px] text-orange-500/70">Method 1</span>
-                                Standard Descend
-                            </span>
+                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none">
+                            <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Get Stuck (GD)</span>
                         </div>
                     </div>
-                    <div className="flex-1 relative min-h-0 overflow-hidden">
+                    <div className="flex-1 relative overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md shadow-lg pointer-events-none">
-                            <span className="text-[8px] md:text-xs font-bold text-emerald-400 uppercase tracking-wider flex flex-col">
-                                <span className="text-[8px] text-emerald-500/70">Method 2</span>
-                                Swarm Optimizer
-                            </span>
+                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none">
+                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Swarm Optimizer</span>
                         </div>
                     </div>
                 </div>
