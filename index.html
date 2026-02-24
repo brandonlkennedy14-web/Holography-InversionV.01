@@ -193,6 +193,13 @@
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
           }, [isRunning, speed, inversionRadius, showDynamicGrid]);
 
+          const handleReset = () => {
+             stateRef.current.stdPath = []; stateRef.current.invPath = []; 
+             stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0;
+             setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0);
+             localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 }));
+          };
+
           return (
             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
                 <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
@@ -216,7 +223,7 @@
                           <span className="text-xs font-medium">Dual Geometry Mesh</span>
                           <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" />
                         </label>
-                        <button onClick={() => { stateRef.current.stdPath = []; stateRef.current.invPath = []; stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0; setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0); localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 })); }} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
+                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
                           <RefreshCw size={12} /> Reset Data
                         </button>
                     </div>
@@ -259,11 +266,10 @@
                 setZetaSorted(simState.current.zetaCount);
                 localStorage.setItem('genesis_zeta', JSON.stringify({ count: simState.current.zetaCount }));
                 
-                // Sync the logs from the fast animation loop to the slower React UI
                 if (simState.current.newLogs.length > 0) {
                     setDataLog(prev => {
                         const updated = [...simState.current.newLogs, ...prev];
-                        return updated.slice(0, 6); // Keep only the latest 6 logs to fit UI
+                        return updated.slice(0, 6); 
                     });
                     simState.current.newLogs = [];
                 }
@@ -313,8 +319,6 @@
                         if (distSq < 400) { 
                             target.consumed = true; 
                             s.zetaCount += 1; 
-                            
-                            // Generate a simulated Zeta visual representation
                             const simulatedT = (14.134725 + (Math.random() * 100)).toFixed(5);
                             s.newLogs.push({ id: Math.random().toString(), text: `ζ(½ + ${simulatedT}i) verified` });
                         } 
@@ -362,7 +366,7 @@
                 }
             }
 
-            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.fill(); });
+            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.shadowBlur = 10; ctx.shadowColor = bot.color; ctx.fill(); ctx.shadowBlur = 0; });
             if (isRunning) requestRef.current = requestAnimationFrame(update);
           };
 
@@ -420,7 +424,7 @@
         };
 
         // ==========================================
-        // TAB 3: MEDICAL APPLICATION (SIDE-BY-SIDE)
+        // TAB 3: MEDICAL APPLICATION (OBSTACLE MAZE)
         // ==========================================
         const MedicalSim = () => {
           const canvasStandardRef = useRef(null);
@@ -459,6 +463,13 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
+            // Define Medical "Tissue/Vein" Obstacles
+            const obstacles = [
+                { x: cw * 0.2, y: 0, w: Math.max(20, cw * 0.1), h: ch * 0.5 }, 
+                { x: cw * 0.7, y: ch * 0.5, w: Math.max(20, cw * 0.1), h: ch * 0.5 },
+                { x: cw * 0.4, y: ch * 0.3, w: Math.max(20, cw * 0.15), h: ch * 0.4 } 
+            ];
+
             if (!s.init && cw > 0 && ch > 0) {
                 s.bots = [];
                 for(let i=0; i<15; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#fb923c', size: 4 });
@@ -466,8 +477,18 @@
             }
             if (!s.init) return;
 
+            // Spawn Targets explicitly in far corners
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                s.targets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false });
+                const corners = [
+                    { x: cw * 0.1, y: ch * 0.1 }, { x: cw * 0.9, y: ch * 0.1 },
+                    { x: cw * 0.1, y: ch * 0.9 }, { x: cw * 0.9, y: ch * 0.9 }
+                ];
+                const corner = corners[Math.floor(Math.random() * corners.length)];
+                s.targets.push({ 
+                    x: corner.x + (Math.random()-0.5)*cw*0.1, 
+                    y: corner.y + (Math.random()-0.5)*ch*0.1, 
+                    consumed: false 
+                });
                 s.lastSpawn = Date.now();
             }
 
@@ -484,7 +505,7 @@
                     s.targets.forEach((target) => {
                         if (target.consumed) return;
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 60000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.0; attractY = (dy/dist) * 2.0; }
+                        if (distSq < 60000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 3.0; attractY = (dy/dist) * 3.0; }
                     });
                 }
 
@@ -494,25 +515,33 @@
                     if (distSq < 400) { target.consumed = true; s.hits += 1; }
                 });
 
-                if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
-                if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
-
                 if (isSwarm) {
                     bot.vx += repulseX + attractX + (Math.random()-0.5)*0.5;
                     bot.vy += repulseY + attractY + (Math.random()-0.5)*0.5;
                     const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 4.5) { bot.vx = (bot.vx/speed)*4.5; bot.vy = (bot.vy/speed)*4.5; }
+                    if (speed > 5.0) { bot.vx = (bot.vx/speed)*5.0; bot.vy = (bot.vy/speed)*5.0; }
                 } else {
-                    // SEVERE NERF to Standard: Pure aimless brownian motion
-                    bot.vx += (Math.random()-0.5) * 1.5;
-                    bot.vy += (Math.random()-0.5) * 1.5;
-                    bot.vx *= 0.95; // Add friction so they don't blast around the screen
-                    bot.vy *= 0.95; 
+                    bot.vx += (Math.random()-0.5) * 1.5; bot.vy += (Math.random()-0.5) * 1.5;
+                    bot.vx *= 0.95; bot.vy *= 0.95; 
                 }
 
-                bot.x += bot.vx; bot.y += bot.vy;
+                // X Axis Movement & Collision
+                bot.x += bot.vx;
                 if (bot.x < 0) { bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
+                obstacles.forEach(obs => {
+                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
+                        bot.x -= bot.vx; bot.vx *= -1;
+                    }
+                });
+
+                // Y Axis Movement & Collision
+                bot.y += bot.vy;
                 if (bot.y < 0) { bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
+                obstacles.forEach(obs => {
+                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
+                        bot.y -= bot.vy; bot.vy *= -1;
+                    }
+                });
 
                 if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 150}); if (s.visitedNodes.length > 200) s.visitedNodes.shift(); }
             });
@@ -521,10 +550,12 @@
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
             ctx.fillStyle = isSwarm ? 'rgba(76, 5, 25, 0.4)' : 'rgba(67, 10, 10, 0.4)'; ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(244, 114, 182, 0.1)'; ctx.lineWidth = 1; ctx.beginPath();
-            for(let x=0; x<cw; x+=60) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
-            for(let y=0; y<ch; y+=60) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
-            ctx.stroke();
+            
+            // Draw Obstacles (Tissue)
+            ctx.fillStyle = 'rgba(159, 18, 57, 0.5)';
+            ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+            ctx.lineWidth = 1;
+            obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
 
             if (isSwarm) {
                 s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI*2); ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1000})`; ctx.fill(); });
@@ -550,10 +581,8 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           const handleReset = () => {
-             simState.current.standard.hits = 0;
-             simState.current.swarm.hits = 0;
-             simState.current.standard.targets = [];
-             simState.current.swarm.targets = [];
+             simState.current.standard.hits = 0; simState.current.swarm.hits = 0;
+             simState.current.standard.targets = []; simState.current.swarm.targets = [];
              setStats({ standard: 0, swarm: 0 });
              localStorage.setItem('genesis_medical', JSON.stringify({ standard: 0, swarm: 0 }));
           };
@@ -565,6 +594,11 @@
                     <div className="flex items-center gap-2 mb-2">
                         <HeartPulse size={18} className="text-rose-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
+                    </div>
+                    <div className="p-3 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Watch Method 1 get completely trapped by the tissue barriers. Watch Method 2 map the barriers and route out of the dead ends.
+                        </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
                         <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
@@ -582,17 +616,16 @@
                   </section>
                 </aside>
                 
-                {/* 50/50 Flex Split - Fixed layout truncation */}
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
                     <div className="flex-1 relative border-b md:border-b-0 md:border-r border-rose-900/50 overflow-hidden">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none">
+                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none z-10">
                             <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Pure Chaos</span>
                         </div>
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none">
+                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none z-10">
                             <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Smith/Blade</span>
                         </div>
                     </div>
@@ -602,7 +635,7 @@
         };
 
         // ==========================================
-        // TAB 4: TECH/DEEP LEARNING (SIDE-BY-SIDE)
+        // TAB 4: TECH/DEEP LEARNING (TRAP MAZE)
         // ==========================================
         const TechSim = () => {
           const canvasStandardRef = useRef(null);
@@ -641,15 +674,30 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
+            // Define Tech "Local Minima" U-Traps
+            const obstacles = [
+                { x: cw * 0.3, y: ch * 0.3, w: cw * 0.4, h: Math.max(15, ch * 0.05) }, // Top of U-trap
+                { x: cw * 0.3, y: ch * 0.3, w: Math.max(15, cw * 0.05), h: ch * 0.4 }, // Left of U-trap
+                { x: cw * 0.7 - Math.max(15, cw * 0.05), y: ch * 0.3, w: Math.max(15, cw * 0.05), h: ch * 0.4 }, // Right of U-trap
+                { x: 0, y: ch * 0.8, w: cw * 0.35, h: Math.max(15, ch * 0.05) }, // Bottom-left wall
+                { x: cw * 0.65, y: ch * 0.8, w: cw * 0.35, h: Math.max(15, ch * 0.05) } // Bottom-right wall
+            ];
+
             if (!s.init && cw > 0 && ch > 0) {
                 s.bots = [];
-                for(let i=0; i<20; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#38bdf8', size: 3 });
+                for(let i=0; i<20; i++) s.bots.push({ x: cw/2, y: ch*0.6, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#38bdf8', size: 3 });
                 s.init = true;
             }
             if (!s.init) return;
 
+            // Spawn Targets primarily near edges/corners to force exploration
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                s.targets.push({ x: 20 + Math.floor(Math.random()*(cw-40)/40)*40, y: 20 + Math.floor(Math.random()*(ch-40)/40)*40, consumed: false });
+                const corners = [
+                    { x: cw * 0.1, y: ch * 0.1 }, { x: cw * 0.9, y: ch * 0.1 },
+                    { x: cw * 0.1, y: ch * 0.9 }, { x: cw * 0.9, y: ch * 0.9 }
+                ];
+                const corner = corners[Math.floor(Math.random() * corners.length)];
+                s.targets.push({ x: corner.x + (Math.random()-0.5)*cw*0.1, y: corner.y + (Math.random()-0.5)*ch*0.1, consumed: false });
                 s.lastSpawn = Date.now();
             }
 
@@ -659,13 +707,13 @@
                 if (isSwarm) {
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 3000 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.4; repulseY += (dy/dist) * 0.4; }
+                        if (distSq < 3000 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.5; repulseY += (dy/dist) * 0.5; }
                     });
                     
                     s.targets.forEach((target) => {
                         if (target.consumed) return;
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.0; attractY = (dy/dist) * 2.0; }
+                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 3.0; attractY = (dy/dist) * 3.0; }
                     });
                 }
 
@@ -675,23 +723,33 @@
                     if (distSq < 400) { target.consumed = true; s.hits += 1; }
                 });
 
-                if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
-                if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
-
                 if (isSwarm) {
                     if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
                     bot.vx += repulseX + attractX; bot.vy += repulseY + attractY;
                     const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
                     if (speed > 5) { bot.vx = (bot.vx/speed)*5; bot.vy = (bot.vy/speed)*5; }
                 } else {
-                    // SEVERE NERF: Standard actively gets stuck in local clusters/minima
                     bot.vx += (Math.random()-0.5) * 2.5; bot.vy += (Math.random()-0.5) * 2.5;
-                    bot.vx *= 0.85; bot.vy *= 0.85; // High friction makes them pool up
+                    bot.vx *= 0.85; bot.vy *= 0.85; 
                 }
 
-                bot.x += bot.vx; bot.y += bot.vy;
+                // X Axis Movement & Collision
+                bot.x += bot.vx;
                 if (bot.x < 0) {bot.x=0; bot.vx *= -1;} if (bot.x > cw) {bot.x=cw; bot.vx *= -1;}
+                obstacles.forEach(obs => {
+                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
+                        bot.x -= bot.vx; bot.vx *= -1;
+                    }
+                });
+
+                // Y Axis Movement & Collision
+                bot.y += bot.vy;
                 if (bot.y < 0) {bot.y=0; bot.vy *= -1;} if (bot.y > ch) {bot.y=ch; bot.vy *= -1;}
+                obstacles.forEach(obs => {
+                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
+                        bot.y -= bot.vy; bot.vy *= -1;
+                    }
+                });
 
                 if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 100}); if (s.visitedNodes.length > 150) s.visitedNodes.shift(); }
             });
@@ -700,10 +758,12 @@
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
             ctx.fillStyle = isSwarm ? 'rgba(2, 6, 23, 0.5)' : 'rgba(15, 5, 5, 0.5)'; ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 1; ctx.beginPath();
-            for(let i=0; i<cw; i+=40) { ctx.moveTo(i, 0); ctx.lineTo(i, ch); }
-            for(let i=0; i<ch; i+=40) { ctx.moveTo(0, i); ctx.lineTo(cw, i); }
-            ctx.stroke();
+            
+            // Draw Obstacles (Data Silos)
+            ctx.fillStyle = 'rgba(8, 47, 73, 0.6)';
+            ctx.strokeStyle = 'rgba(14, 165, 233, 0.5)';
+            ctx.lineWidth = 1;
+            obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
 
             if (isSwarm) {
                 s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.rect(node.x-2, node.y-2, 4, 4); ctx.fillStyle = `rgba(56, 189, 248, ${node.age/200})`; ctx.fill(); });
@@ -716,7 +776,7 @@
                 }
             }
 
-            s.targets.forEach(target => { ctx.beginPath(); ctx.arc(target.x, target.y, 6, 0, Math.PI*2); ctx.fillStyle = 'rgba(244, 63, 94, 0.6)'; ctx.fill(); });
+            s.targets.forEach(target => { ctx.beginPath(); ctx.arc(target.x, target.y, 6, 0, Math.PI*2); ctx.fillStyle = 'rgba(244, 63, 94, 0.8)'; ctx.fill(); });
             s.bots.forEach(bot => { ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2); ctx.fillStyle = bot.color; ctx.fill(); });
           };
 
@@ -729,10 +789,8 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           const handleReset = () => {
-             simState.current.standard.hits = 0;
-             simState.current.swarm.hits = 0;
-             simState.current.standard.targets = [];
-             simState.current.swarm.targets = [];
+             simState.current.standard.hits = 0; simState.current.swarm.hits = 0;
+             simState.current.standard.targets = []; simState.current.swarm.targets = [];
              setStats({ standard: 0, swarm: 0 });
              localStorage.setItem('genesis_tech', JSON.stringify({ standard: 0, swarm: 0 }));
           };
@@ -744,6 +802,11 @@
                     <div className="flex items-center gap-2 mb-2">
                         <CpuIcon size={18} className="text-sky-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Deep Learning</h2>
+                    </div>
+                    <div className="p-3 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                            Left: Algorithms get trapped in "local minima" structures. Right: Swarm maps failures and actively repels out of traps.
+                        </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
                         <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
@@ -761,17 +824,16 @@
                   </section>
                 </aside>
                 
-                {/* 50/50 Flex Split - Fixed layout truncation */}
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
                     <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800 overflow-hidden">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#0f0505]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none">
+                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none z-10">
                             <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Get Stuck (GD)</span>
                         </div>
                     </div>
                     <div className="flex-1 relative overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none">
+                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none z-10">
                             <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Swarm Optimizer</span>
                         </div>
                     </div>
