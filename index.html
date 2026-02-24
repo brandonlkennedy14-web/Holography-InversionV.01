@@ -38,19 +38,42 @@
           const [isRunning, setIsRunning] = useState(false);
           const [inversionRadius, setInversionRadius] = useState(100);
           const [speed, setSpeed] = useState(2);
+          const [showInversionCircle, setShowInversionCircle] = useState(true);
+          const [showDynamicGrid, setShowDynamicGrid] = useState(true);
+          
+          // Persistent State Hooks
           const [windingNumber, setWindingNumber] = useState(0);
           const [cornerHits, setCornerHits] = useState(0);
           const [configsRegistered, setConfigsRegistered] = useState(0);
-          const [trailLength, setTrailLength] = useState(3000);
-          const [showInversionCircle, setShowInversionCircle] = useState(true);
-          const [showDynamicGrid, setShowDynamicGrid] = useState(true);
 
           const canvasRef = useRef(null);
           const requestRef = useRef(null);
           const stateRef = useRef({ 
             pos: { x: null, y: null }, vel: { x: 1.8, y: 1.3 }, 
-            stdPath: [], invPath: [], gridPhase: 0, configCounter: 0, frameCount: 0 
+            stdPath: [], invPath: [], gridPhase: 0,
+            winding: 0, corners: 0, configs: 0 // Local loop refs
           });
+
+          // Persistent Logging Init
+          useEffect(() => {
+            const saved = JSON.parse(localStorage.getItem('genesis_billiard') || '{}');
+            stateRef.current.winding = saved.winding || 0;
+            stateRef.current.corners = saved.corners || 0;
+            stateRef.current.configs = saved.configs || 0;
+            
+            // Sync to UI every 500ms so we don't spam React
+            const syncInterval = setInterval(() => {
+                setWindingNumber(stateRef.current.winding);
+                setCornerHits(stateRef.current.corners);
+                setConfigsRegistered(stateRef.current.configs);
+                localStorage.setItem('genesis_billiard', JSON.stringify({
+                    winding: stateRef.current.winding,
+                    corners: stateRef.current.corners,
+                    configs: stateRef.current.configs
+                }));
+            }, 500);
+            return () => clearInterval(syncInterval);
+          }, []);
 
           useEffect(() => {
             const canvas = canvasRef.current;
@@ -86,6 +109,7 @@
             
             const boundSize = Math.min(cw, ch) * 0.55; 
             const halfSize = boundSize / 2;
+            const trailLength = 3000;
 
             if (s.pos.x === null) s.pos = { x: cx, y: cy };
 
@@ -103,8 +127,8 @@
               else if (s.pos.y >= bottom) { s.vel.y *= -1; s.pos.y = bottom - 1; hitCornerY = Math.abs(s.pos.x - left) < 15 || Math.abs(s.pos.x - right) < 15; }
 
               if (hitCornerX || hitCornerY) {
-                setCornerHits(prev => prev + 1);
-                setWindingNumber(prev => prev + (s.vel.x * s.vel.y > 0 ? 1 : -1));
+                s.corners += 1;
+                s.winding += (s.vel.x * s.vel.y > 0 ? 1 : -1);
               }
 
               s.stdPath.push({x: s.pos.x, y: s.pos.y});
@@ -116,23 +140,21 @@
             }
 
             s.gridPhase += 0.05 * speed;
-            s.configCounter += Math.floor(speed * 4);
-            s.frameCount++;
-            if (s.frameCount % 10 === 0) setConfigsRegistered(s.configCounter);
+            s.configs += Math.floor(speed * 4); // Accumulate config parsing constantly
 
             ctx.clearRect(0, 0, cw, ch);
 
-            // Draw Static Background Grid for visual context
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            // Draw Stronger Background Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            for(let x=0; x<cw; x+=40) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
-            for(let y=0; y<ch; y+=40) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
+            for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
+            for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
             ctx.stroke();
 
             // Draw Dynamic Configuration Grid inside boundary
             if (showDynamicGrid) {
-              ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)'; 
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; 
               ctx.lineWidth = 1;
               ctx.beginPath();
               const phaseOffset = Math.sin(s.gridPhase) * 20;
@@ -147,16 +169,16 @@
 
             if (showInversionCircle) {
               ctx.beginPath(); ctx.arc(cx, cy, inversionRadius, 0, Math.PI * 2);
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
+            ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
             ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
 
             if (s.stdPath.length > 1) {
               ctx.beginPath(); ctx.moveTo(s.stdPath[0].x, s.stdPath[0].y);
               for (let i = 1; i < s.stdPath.length; i++) ctx.lineTo(s.stdPath[i].x, s.stdPath[i].y);
-              ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)'; ctx.lineWidth = 1; ctx.stroke();
             }
 
             if (s.invPath.length > 1) {
@@ -167,11 +189,11 @@
               ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
             }
 
-            ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 3, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 4, 0, Math.PI * 2);
             ctx.fillStyle = '#38bdf8'; ctx.shadowBlur = 10; ctx.shadowColor = '#38bdf8'; ctx.fill(); ctx.shadowBlur = 0;
 
             const currentInv = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
-            ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
+            ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 5, 0, Math.PI * 2);
             ctx.fillStyle = '#f472b6'; ctx.shadowBlur = 10; ctx.shadowColor = '#f472b6'; ctx.fill(); ctx.shadowBlur = 0;
 
             requestRef.current = requestAnimationFrame(update);
@@ -181,44 +203,54 @@
             if (isRunning) requestRef.current = requestAnimationFrame(update);
             else if (requestRef.current) cancelAnimationFrame(requestRef.current);
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning, speed, inversionRadius, trailLength, showDynamicGrid]);
+          }, [isRunning, speed, inversionRadius, showDynamicGrid]);
+
+          const handleReset = () => {
+             stateRef.current.stdPath = []; 
+             stateRef.current.invPath = []; 
+             stateRef.current.winding = 0; 
+             stateRef.current.corners = 0; 
+             stateRef.current.configs = 0;
+             setWindingNumber(0);
+             setCornerHits(0);
+             setConfigsRegistered(0);
+             localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 }));
+          };
 
           return (
             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
-                  <section className="space-y-6">
-                    <div className="flex justify-between items-center mb-4">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
+                  <section className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">Controls</h2>
                         <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-indigo-500'}`}>{isRunning ? 'Pause' : 'Start'}</button>
                     </div>
-                    <div>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
+                    <div className="space-y-4">
+                        <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Inversion Radius</label><span className="text-indigo-400 font-mono">{inversionRadius}px</span></div>
                           <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Speed</label><span className="text-indigo-400 font-mono">x{speed}</span></div>
                           <input type="range" min="1" max="10" value={speed} onChange={(e) => setSpeed(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
                         </div>
-                      </div>
                     </div>
-                    <div className="pt-4 border-t border-slate-800 space-y-3">
-                        <label className="flex items-center justify-between p-2 md:p-3 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50">
-                          <span className="text-xs md:text-sm font-medium">Dual Geometry Mesh</span>
+                    <div className="pt-2 border-t border-slate-800 space-y-2">
+                        <label className="flex items-center justify-between p-2 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50">
+                          <span className="text-xs font-medium">Dual Geometry Mesh</span>
                           <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" />
                         </label>
-                        <button onClick={() => { stateRef.current.stdPath = []; stateRef.current.invPath = []; setCornerHits(0); setWindingNumber(0); stateRef.current.configCounter = 0; setConfigsRegistered(0); }} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-sm">
-                          <RefreshCw size={14} /> Reset Path
+                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
+                          <RefreshCw size={12} /> Reset Data
                         </button>
                     </div>
                   </section>
                 </aside>
 
-                <div className="flex-1 relative min-h-0 bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)]">
+                <div className="flex-1 relative min-h-0 bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)] overflow-hidden">
                   <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                    <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3 rounded-xl min-w-[200px] shadow-2xl">
+                    <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl min-w-[200px] shadow-2xl">
                       <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Free Configs</span><span className="text-sky-400 font-mono">{configsRegistered.toLocaleString()}</span></div>
                       <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Winding</span><span className="text-emerald-400 font-mono">{windingNumber}</span></div>
                       <div className="flex justify-between text-xs"><span className="text-slate-500">Corners</span><span className="text-amber-400 font-mono">{cornerHits}</span></div>
@@ -238,7 +270,19 @@
           const [zetaSorted, setZetaSorted] = useState(0);
           const [isRunning, setIsRunning] = useState(true);
 
-          const simState = useRef({ bots: [], visitedNodes: [], zetaTargets: [], lastSpawn: 0 });
+          const simState = useRef({ bots: [], visitedNodes: [], zetaTargets: [], lastSpawn: 0, zetaCount: 0 });
+
+          // Persistent Logging Init
+          useEffect(() => {
+            const saved = JSON.parse(localStorage.getItem('genesis_zeta') || '{}');
+            simState.current.zetaCount = saved.count || 0;
+            
+            const syncInterval = setInterval(() => {
+                setZetaSorted(simState.current.zetaCount);
+                localStorage.setItem('genesis_zeta', JSON.stringify({ count: simState.current.zetaCount }));
+            }, 500);
+            return () => clearInterval(syncInterval);
+          }, []);
 
           useEffect(() => {
             const canvas = canvasRef.current;
@@ -260,8 +304,8 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
-            if (Date.now() - s.lastSpawn > 1000 && s.zetaTargets.length < 30) {
-                s.zetaTargets.push({ x: Math.random() * cw, y: Math.random() * ch, val: Math.floor(Math.random()*1000), consumed: false });
+            if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 30) {
+                s.zetaTargets.push({ x: Math.random() * cw, y: Math.random() * ch, consumed: false });
                 s.lastSpawn = Date.now();
             }
 
@@ -274,11 +318,15 @@
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
                 s.zetaTargets.forEach((target) => {
-                    if (target.consumed) return; // Ignore already eaten targets
+                    if (target.consumed) return; 
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < 100 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    // Mark as consumed instead of splicing array during iteration to prevent bugs
-                    if (dist < 15) { target.consumed = true; } 
+                    if (dist < 120 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
+                    
+                    // Increased hit radius to 25 to prevent missing targets
+                    if (dist < 25) { 
+                        target.consumed = true; 
+                        s.zetaCount += 1; // Log safely to ref
+                    } 
                 });
 
                 let dirX = 0; let dirY = 0;
@@ -286,34 +334,28 @@
                 if (bot.group === 2) dirY = 0.5;
                 if (bot.group === 3) { dirX = (bot.x - cw/2) > 0 ? 0.2 : -0.2; dirY = (bot.y - ch/2) > 0 ? 0.2 : -0.2; }
 
-                bot.vx += repulseX + attractX * 0.5 + dirX; bot.vy += repulseY + attractY * 0.5 + dirY;
+                bot.vx += repulseX + attractX * 0.6 + dirX; bot.vy += repulseY + attractY * 0.6 + dirY;
                 const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                if (speed > 3) { bot.vx = (bot.vx/speed)*3; bot.vy = (bot.vy/speed)*3; }
+                if (speed > 3.5) { bot.vx = (bot.vx/speed)*3.5; bot.vy = (bot.vy/speed)*3.5; }
 
                 bot.x += bot.vx; bot.y += bot.vy;
                 if (bot.x < 0) { bot.x = 0; bot.vx *= -1; } if (bot.x > cw) { bot.x = cw; bot.vx *= -1; }
                 if (bot.y < 0) { bot.y = 0; bot.vy *= -1; } if (bot.y > ch) { bot.y = ch; bot.vy *= -1; }
 
-                if (Math.random() < 0.1) {
+                if (Math.random() < 0.15) {
                     s.visitedNodes.push({x: bot.x, y: bot.y, age: 255});
-                    if (s.visitedNodes.length > 200) s.visitedNodes.shift();
+                    if (s.visitedNodes.length > 250) s.visitedNodes.shift();
                 }
             });
 
-            // Filter out consumed targets safely at the end of the frame
-            const initialTargetCount = s.zetaTargets.length;
+            // Filter consumed
             s.zetaTargets = s.zetaTargets.filter(t => !t.consumed);
-            const targetsEatenThisFrame = initialTargetCount - s.zetaTargets.length;
-            if (targetsEatenThisFrame > 0) {
-                setZetaSorted(prev => prev + targetsEatenThisFrame);
-            }
-
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.3)'; ctx.fillRect(0, 0, cw, ch);
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.4)'; ctx.fillRect(0, 0, cw, ch);
             
-            // Draw background grid
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            // Draw Strong Background Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
@@ -326,9 +368,9 @@
             });
 
             s.zetaTargets.forEach(target => {
-                ctx.beginPath(); ctx.rect(target.x-4, target.y-4, 8, 8);
-                ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1; ctx.stroke();
-                ctx.fillStyle = 'rgba(74, 222, 128, 0.2)'; ctx.fill();
+                ctx.beginPath(); ctx.rect(target.x-5, target.y-5, 10, 10);
+                ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = 'rgba(74, 222, 128, 0.3)'; ctx.fill();
             });
 
             ctx.lineWidth = 0.5;
@@ -337,7 +379,7 @@
                     const b1 = s.bots[i]; const b2 = s.bots[j];
                     if (b1.group === b2.group) {
                         const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                        if (dx*dx + dy*dy < 20000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = b1.color + '40'; ctx.stroke(); }
+                        if (dx*dx + dy*dy < 20000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = b1.color + '60'; ctx.stroke(); }
                     }
                 }
             }
@@ -358,26 +400,26 @@
 
           return (
              <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
-                  <section className="space-y-6">
-                    <div className="flex justify-between items-center mb-4">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
+                  <section className="space-y-4">
+                    <div className="flex justify-between items-center mb-2">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400">Protocol</h2>
                         <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-emerald-500'}`}>{isRunning ? 'Halt' : 'Resume'}</button>
                     </div>
 
-                    <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Zeta Numbers</div>
+                    <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-600 shadow-lg">
+                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Zeta Numbers Mapped</div>
                         <div className="text-3xl font-mono text-emerald-400">{zetaSorted.toLocaleString()}</div>
                     </div>
 
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-cyan-500/20"><div className="w-3 h-3 rounded-full bg-cyan-400"></div><div><div className="text-sm font-bold text-slate-200">G1 (Upward)</div></div></div>
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-rose-500/20"><div className="w-3 h-3 rounded-full bg-rose-400"></div><div><div className="text-sm font-bold text-slate-200">G2 (Downward)</div></div></div>
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-lg border border-amber-500/20"><div className="w-3 h-3 rounded-full bg-amber-400"></div><div><div className="text-sm font-bold text-slate-200">G3 (Radial)</div></div></div>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-cyan-500/20"><div className="w-3 h-3 rounded-full bg-cyan-400"></div><div><div className="text-xs font-bold text-slate-200">G1 (Upward)</div></div></div>
+                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-rose-500/20"><div className="w-3 h-3 rounded-full bg-rose-400"></div><div><div className="text-xs font-bold text-slate-200">G2 (Downward)</div></div></div>
+                        <div className="flex items-center gap-3 p-2 bg-slate-800/40 rounded-lg border border-amber-500/20"><div className="w-3 h-3 rounded-full bg-amber-400"></div><div><div className="text-xs font-bold text-slate-200">G3 (Radial)</div></div></div>
                     </div>
                   </section>
                 </aside>
-                <div className="flex-1 relative min-h-0 bg-slate-950">
+                <div className="flex-1 relative min-h-0 bg-slate-950 overflow-hidden">
                   <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
                 </div>
              </div>
@@ -394,9 +436,24 @@
           
           const [stats, setStats] = useState({ standard: 0, swarm: 0 });
           const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 }
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 }
           });
+
+          useEffect(() => {
+            const saved = JSON.parse(localStorage.getItem('genesis_medical') || '{}');
+            simState.current.standard.hits = saved.standard || 0;
+            simState.current.swarm.hits = saved.swarm || 0;
+            
+            const syncInterval = setInterval(() => {
+                setStats({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits });
+                localStorage.setItem('genesis_medical', JSON.stringify({ 
+                    standard: simState.current.standard.hits, 
+                    swarm: simState.current.swarm.hits 
+                }));
+            }, 500);
+            return () => clearInterval(syncInterval);
+          }, []);
 
           useEffect(() => {
             const handleResize = () => {
@@ -412,7 +469,6 @@
                 for(let i=0; i<15; i++) arr.push({ x: window.innerWidth/4, y: window.innerHeight/4, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: '#f8fafc', size: 4 });
                 return arr;
             };
-            
             simState.current.standard.bots = initBots();
             simState.current.swarm.bots = initBots();
 
@@ -420,9 +476,8 @@
           }, []);
 
           const updateEngine = (s, canvas, isSwarm) => {
-            if (!canvas) return 0;
+            if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
-            let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 2000 && s.targets.length < 10) {
                 s.targets.push({ x: Math.random() * cw, y: Math.random() * ch, consumed: false });
@@ -445,7 +500,7 @@
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
                     const detectionRadius = isSwarm ? 150 : 50; 
                     if (dist < detectionRadius && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 20) { target.consumed = true; foundCount++; }
+                    if (dist < 25) { target.consumed = true; s.hits += 1; }
                 });
 
                 bot.vx += repulseX + attractX * 1.2 + (Math.random()-0.5)*0.5;
@@ -466,10 +521,11 @@
             s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            ctx.fillStyle = 'rgba(76, 5, 25, 0.4)'; ctx.fillRect(0, 0, cw, ch);
+            // Give Standard a slightly different tint to easily differentiate
+            ctx.fillStyle = isSwarm ? 'rgba(76, 5, 25, 0.4)' : 'rgba(67, 10, 10, 0.4)'; 
+            ctx.fillRect(0, 0, cw, ch);
             
-            // Draw biological grid context
-            ctx.strokeStyle = 'rgba(244, 114, 182, 0.05)';
+            ctx.strokeStyle = 'rgba(244, 114, 182, 0.1)';
             ctx.lineWidth = 1;
             ctx.beginPath();
             for(let x=0; x<cw; x+=60) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
@@ -486,21 +542,26 @@
                 ctx.fillStyle = '#fef08a'; ctx.shadowBlur = 15; ctx.shadowColor = '#eab308'; ctx.fill(); ctx.shadowBlur = 0;
             });
 
+            if (isSwarm) {
+                ctx.lineWidth = 0.5;
+                for(let i=0; i<s.bots.length; i++) {
+                    for(let j=i+1; j<s.bots.length; j++) {
+                        const b1 = s.bots[i]; const b2 = s.bots[j];
+                        const dx = b1.x - b2.x; const dy = b1.y - b2.y;
+                        if (dx*dx + dy*dy < 10000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = 'rgba(248, 113, 113, 0.4)'; ctx.stroke(); }
+                    }
+                }
+            }
+
             s.bots.forEach(bot => {
                 ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2);
                 ctx.fillStyle = bot.color; ctx.fill();
             });
-
-            return foundCount;
           };
 
           const update = () => {
-             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false);
-             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
-             
-             if (foundStd > 0 || foundSwm > 0) {
-                 setStats(prev => ({ standard: prev.standard + foundStd, swarm: prev.swarm + foundSwm }));
-             }
+             updateEngine(simState.current.standard, canvasStandardRef.current, false);
+             updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
              requestRef.current = requestAnimationFrame(update);
           };
 
@@ -508,26 +569,25 @@
 
           return (
              <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <HeartPulse size={20} className="text-rose-400" />
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <HeartPulse size={18} className="text-rose-400" />
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
                     </div>
-                    <div className="p-4 bg-rose-900/20 rounded-xl border border-rose-500/30">
-                        <div className="text-sm text-slate-200 font-bold mb-2">A/B Comparison</div>
+                    <div className="p-3 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
                         <p className="text-xs text-slate-400 leading-relaxed">
-                            Watch the left simulation blindly wander (Standard/Random). Watch the right simulation efficiently map and clear the tissue using shared memory.
+                            Watch Method 1 blindly wander. Watch Method 2 efficiently map and clear the tissue using shared memory.
                         </p>
                     </div>
                     
                     <div className="grid grid-cols-2 gap-2">
-                        <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-700">
-                            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Standard Hits</div>
+                        <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
+                            <div className="text-[10px] text-orange-300 uppercase font-bold mb-1">M1: Standard</div>
                             <div className="text-xl font-mono text-white">{stats.standard}</div>
                         </div>
-                        <div className="p-3 bg-rose-900/50 rounded-xl border border-rose-500/50">
-                            <div className="text-[10px] text-rose-300 uppercase font-bold mb-1">Swarm Hits</div>
+                        <div className="p-3 bg-emerald-900/40 rounded-xl border border-emerald-500/50 shadow-inner">
+                            <div className="text-[10px] text-emerald-300 uppercase font-bold mb-1">M2: Holo Swarm</div>
                             <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
@@ -535,16 +595,22 @@
                 </aside>
                 
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
-                    <div className="flex-1 relative min-h-[50%] md:min-h-0 border-b md:border-b-0 md:border-r border-rose-900/50">
+                    <div className="flex-1 relative min-h-0 border-b md:border-b-0 md:border-r border-rose-900/50 overflow-hidden">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard</span>
+                        <div className="absolute top-4 left-4 bg-orange-950/90 px-3 py-1.5 rounded-lg border border-orange-800 backdrop-blur-md shadow-lg pointer-events-none">
+                            <span className="text-xs font-bold text-orange-400 uppercase tracking-widest flex flex-col">
+                                <span className="text-[9px] text-orange-500/70">Method 1</span>
+                                Standard Wander
+                            </span>
                         </div>
                     </div>
-                    <div className="flex-1 relative min-h-[50%] md:min-h-0">
+                    <div className="flex-1 relative min-h-0 overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-4 left-4 bg-rose-900/80 px-3 py-1.5 rounded-lg border border-rose-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-rose-300 uppercase tracking-widest">Smith/Blade</span>
+                        <div className="absolute top-4 left-4 bg-emerald-950/90 px-3 py-1.5 rounded-lg border border-emerald-800 backdrop-blur-md shadow-lg pointer-events-none">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex flex-col">
+                                <span className="text-[9px] text-emerald-500/70">Method 2</span>
+                                Smith/Blade Swarm
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -562,9 +628,24 @@
           
           const [stats, setStats] = useState({ standard: 0, swarm: 0 });
           const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0 }
+            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 },
+            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0 }
           });
+
+          useEffect(() => {
+            const saved = JSON.parse(localStorage.getItem('genesis_tech') || '{}');
+            simState.current.standard.hits = saved.standard || 0;
+            simState.current.swarm.hits = saved.swarm || 0;
+            
+            const syncInterval = setInterval(() => {
+                setStats({ standard: simState.current.standard.hits, swarm: simState.current.swarm.hits });
+                localStorage.setItem('genesis_tech', JSON.stringify({ 
+                    standard: simState.current.standard.hits, 
+                    swarm: simState.current.swarm.hits 
+                }));
+            }, 500);
+            return () => clearInterval(syncInterval);
+          }, []);
 
           useEffect(() => {
             const handleResize = () => {
@@ -588,9 +669,8 @@
           }, []);
 
           const updateEngine = (s, canvas, isSwarm) => {
-            if (!canvas) return 0;
+            if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
-            let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
                 s.targets.push({ x: Math.floor(Math.random() * (cw/40))*40, y: Math.floor(Math.random() * (ch/40))*40, consumed: false });
@@ -613,7 +693,7 @@
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
                     const detection = isSwarm ? 200 : 80;
                     if (dist < detection && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 15) { target.consumed = true; foundCount++; }
+                    if (dist < 25) { target.consumed = true; s.hits += 1; }
                 });
 
                 if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
@@ -635,8 +715,9 @@
             s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
-            ctx.fillStyle = 'rgba(2, 6, 23, 0.5)'; ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
+            ctx.fillStyle = isSwarm ? 'rgba(2, 6, 23, 0.5)' : 'rgba(15, 5, 5, 0.5)'; 
+            ctx.fillRect(0, 0, cw, ch);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 1;
             ctx.beginPath();
             for(let i=0; i<cw; i+=40) { ctx.moveTo(i, 0); ctx.lineTo(i, ch); }
             for(let i=0; i<ch; i+=40) { ctx.moveTo(0, i); ctx.lineTo(cw, i); }
@@ -661,21 +742,18 @@
                         const dx = b1.x - b2.x; const dy = b1.y - b2.y;
                         if (dx*dx + dy*dy < 10000) { 
                             ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b1.x, b2.y); ctx.lineTo(b2.x, b2.y); 
-                            ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.stroke(); 
+                            ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.stroke(); 
                         }
                     }
                 }
             }
 
             s.bots.forEach(bot => { ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2); ctx.fillStyle = bot.color; ctx.fill(); });
-            
-            return foundCount;
           };
 
           const update = () => {
-             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false);
-             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
-             if (foundStd > 0 || foundSwm > 0) setStats(prev => ({ standard: prev.standard + foundStd, swarm: prev.swarm + foundSwm }));
+             updateEngine(simState.current.standard, canvasStandardRef.current, false);
+             updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
              requestRef.current = requestAnimationFrame(update);
           };
 
@@ -683,25 +761,27 @@
 
           return (
              <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
-                  <section className="space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
-                        <CpuIcon size={20} className="text-sky-400" />
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-sky-400">Deep Learning App</h2>
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
+                  <section className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <CpuIcon size={18} className="text-sky-400" />
+                        <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Deep Learning</h2>
                     </div>
-                    <div className="p-4 bg-slate-800/80 rounded-xl border border-sky-500/30">
-                        <div className="text-sm text-slate-200 font-bold mb-2">A/B Testing</div>
-                        <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                            Left: Standard algorithms frequently get trapped in "local minima" (loops). Right: Holographic Swarm maps failures and actively repels, finding the "global minima" much faster.
+                    <div className="p-3 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
+                        <p className="text-xs text-slate-400 leading-relaxed mb-1">
+                            Left/Top: Standard algorithms frequently get trapped in "local minima". 
+                        </p>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            Right/Bottom: Holographic Swarm dynamically repels away from dead ends.
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                        <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-700">
-                            <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">Standard GD</div>
+                        <div className="p-3 bg-orange-900/40 rounded-xl border border-orange-700/50 shadow-inner">
+                            <div className="text-[10px] text-orange-300 uppercase font-bold mb-1">M1: Standard</div>
                             <div className="text-xl font-mono text-white">{stats.standard}</div>
                         </div>
-                        <div className="p-3 bg-sky-900/50 rounded-xl border border-sky-500/50">
-                            <div className="text-[10px] text-sky-300 uppercase font-bold mb-1">Holo Swarm</div>
+                        <div className="p-3 bg-emerald-900/40 rounded-xl border border-emerald-500/50 shadow-inner">
+                            <div className="text-[10px] text-emerald-300 uppercase font-bold mb-1">M2: Holo Swarm</div>
                             <div className="text-xl font-mono text-white">{stats.swarm}</div>
                         </div>
                     </div>
@@ -709,16 +789,22 @@
                 </aside>
                 
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
-                    <div className="flex-1 relative min-h-[50%] md:min-h-0 border-b md:border-b-0 md:border-r border-slate-800">
-                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
-                        <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard Descend</span>
+                    <div className="flex-1 relative min-h-0 border-b md:border-b-0 md:border-r border-slate-800 overflow-hidden">
+                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#0f0505]" />
+                        <div className="absolute top-4 left-4 bg-orange-950/90 px-3 py-1.5 rounded-lg border border-orange-800 backdrop-blur-md shadow-lg pointer-events-none">
+                            <span className="text-xs font-bold text-orange-400 uppercase tracking-widest flex flex-col">
+                                <span className="text-[9px] text-orange-500/70">Method 1</span>
+                                Standard Descend
+                            </span>
                         </div>
                     </div>
-                    <div className="flex-1 relative min-h-[50%] md:min-h-0">
+                    <div className="flex-1 relative min-h-0 overflow-hidden">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
-                        <div className="absolute top-4 left-4 bg-sky-900/80 px-3 py-1.5 rounded-lg border border-sky-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-sky-300 uppercase tracking-widest">Swarm Optimization</span>
+                        <div className="absolute top-4 left-4 bg-emerald-950/90 px-3 py-1.5 rounded-lg border border-emerald-800 backdrop-blur-md shadow-lg pointer-events-none">
+                            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest flex flex-col">
+                                <span className="text-[9px] text-emerald-500/70">Method 2</span>
+                                Swarm Optimizer
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -734,7 +820,7 @@
 
           return (
             <div className="flex flex-col h-[100dvh] bg-slate-950 text-slate-100 font-sans overflow-hidden">
-              <header className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-3 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md z-20 gap-4 shadow-xl">
+              <header className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-3 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md z-20 gap-4 shadow-xl flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
                     <Activity size={24} />
