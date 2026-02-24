@@ -60,7 +60,6 @@
               if (container) { 
                 canvas.width = container.clientWidth; 
                 canvas.height = container.clientHeight; 
-                // Reset position to center on resize to prevent getting stuck outside bounds
                 if (!stateRef.current.pos.x) {
                   stateRef.current.pos = { x: canvas.width/2, y: canvas.height/2 };
                 }
@@ -85,11 +84,9 @@
             const cw = canvas.width; const ch = canvas.height;
             const cx = cw / 2; const cy = ch / 2; 
             
-            // Scaled down to 0.55 to guarantee all bounce information is fully visible
             const boundSize = Math.min(cw, ch) * 0.55; 
             const halfSize = boundSize / 2;
 
-            // Ensure ball is initialized
             if (s.pos.x === null) s.pos = { x: cx, y: cy };
 
             for (let i = 0; i < speed; i++) {
@@ -99,7 +96,6 @@
               const top = cy - halfSize; const bottom = cy + halfSize;
               let hitCornerX = false; let hitCornerY = false;
 
-              // Constrain and bounce
               if (s.pos.x <= left) { s.vel.x *= -1; s.pos.x = left + 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
               else if (s.pos.x >= right) { s.vel.x *= -1; s.pos.x = right - 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
               
@@ -111,7 +107,6 @@
                 setWindingNumber(prev => prev + (s.vel.x * s.vel.y > 0 ? 1 : -1));
               }
 
-              // Record BOTH geometries simultaneously (Free artifacts)
               s.stdPath.push({x: s.pos.x, y: s.pos.y});
               if (s.stdPath.length > trailLength) s.stdPath.shift();
 
@@ -120,13 +115,20 @@
               if (s.invPath.length > trailLength) s.invPath.shift();
             }
 
-            // Config Registration & Grid Phase (Free Compute Metric)
             s.gridPhase += 0.05 * speed;
             s.configCounter += Math.floor(speed * 4);
             s.frameCount++;
             if (s.frameCount % 10 === 0) setConfigsRegistered(s.configCounter);
 
             ctx.clearRect(0, 0, cw, ch);
+
+            // Draw Static Background Grid for visual context
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let x=0; x<cw; x+=40) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
+            for(let y=0; y<ch; y+=40) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
+            ctx.stroke();
 
             // Draw Dynamic Configuration Grid inside boundary
             if (showDynamicGrid) {
@@ -148,18 +150,15 @@
               ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
-            // Standard Boundary
             ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)';
             ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
 
-            // 1. Draw Standard Trajectory (Dual Artifact)
             if (s.stdPath.length > 1) {
               ctx.beginPath(); ctx.moveTo(s.stdPath[0].x, s.stdPath[0].y);
               for (let i = 1; i < s.stdPath.length; i++) ctx.lineTo(s.stdPath[i].x, s.stdPath[i].y);
               ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
             }
 
-            // 2. Draw Inverted Trajectory (Dual Artifact)
             if (s.invPath.length > 1) {
               ctx.beginPath(); ctx.moveTo(s.invPath[0].x, s.invPath[0].y);
               for (let i = 1; i < s.invPath.length; i++) ctx.lineTo(s.invPath[i].x, s.invPath[i].y);
@@ -168,7 +167,6 @@
               ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
             }
 
-            // Draw Current Particles (Standard & Inverted)
             ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 3, 0, Math.PI * 2);
             ctx.fillStyle = '#38bdf8'; ctx.shadowBlur = 10; ctx.shadowColor = '#38bdf8'; ctx.fill(); ctx.shadowBlur = 0;
 
@@ -186,8 +184,8 @@
           }, [isRunning, speed, inversionRadius, trailLength, showDynamicGrid]);
 
           return (
-            <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-72 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[35vh] md:max-h-none">
+            <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
                   <section className="space-y-6">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">Controls</h2>
@@ -217,7 +215,7 @@
                   </section>
                 </aside>
 
-                <div className="flex-1 min-h-[50vh] bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)] relative">
+                <div className="flex-1 relative min-h-0 bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)]">
                   <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
                     <div className="bg-slate-900/80 backdrop-blur-md border border-slate-800 p-3 rounded-xl min-w-[200px] shadow-2xl">
@@ -230,6 +228,7 @@
             </div>
           );
         };
+
         // ==========================================
         // TAB 2: ZETA SWARM (SMITH & BLADE LOGIC)
         // ==========================================
@@ -262,7 +261,7 @@
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
             if (Date.now() - s.lastSpawn > 1000 && s.zetaTargets.length < 30) {
-                s.zetaTargets.push({ x: Math.random() * cw, y: Math.random() * ch, val: Math.floor(Math.random()*1000) });
+                s.zetaTargets.push({ x: Math.random() * cw, y: Math.random() * ch, val: Math.floor(Math.random()*1000), consumed: false });
                 s.lastSpawn = Date.now();
             }
 
@@ -274,10 +273,12 @@
                 });
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
-                s.zetaTargets.forEach((target, index) => {
+                s.zetaTargets.forEach((target) => {
+                    if (target.consumed) return; // Ignore already eaten targets
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
                     if (dist < 100 && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 15) { s.zetaTargets.splice(index, 1); setZetaSorted(prev => prev + 1); }
+                    // Mark as consumed instead of splicing array during iteration to prevent bugs
+                    if (dist < 15) { target.consumed = true; } 
                 });
 
                 let dirX = 0; let dirY = 0;
@@ -299,9 +300,26 @@
                 }
             });
 
+            // Filter out consumed targets safely at the end of the frame
+            const initialTargetCount = s.zetaTargets.length;
+            s.zetaTargets = s.zetaTargets.filter(t => !t.consumed);
+            const targetsEatenThisFrame = initialTargetCount - s.zetaTargets.length;
+            if (targetsEatenThisFrame > 0) {
+                setZetaSorted(prev => prev + targetsEatenThisFrame);
+            }
+
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
             ctx.fillStyle = 'rgba(15, 23, 42, 0.3)'; ctx.fillRect(0, 0, cw, ch);
+            
+            // Draw background grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
+            for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
+            ctx.stroke();
+
             s.visitedNodes.forEach(node => {
                 ctx.beginPath(); ctx.arc(node.x, node.y, 2, 0, Math.PI*2);
                 ctx.fillStyle = `rgba(255, 255, 255, ${node.age/1000})`; ctx.fill();
@@ -339,8 +357,8 @@
           }, [isRunning]);
 
           return (
-             <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-                <aside className="w-full md:w-72 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
                   <section className="space-y-6">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400">Protocol</h2>
@@ -359,7 +377,7 @@
                     </div>
                   </section>
                 </aside>
-                <div className="flex-1 min-h-[50vh] bg-slate-950 relative">
+                <div className="flex-1 relative min-h-0 bg-slate-950">
                   <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
                 </div>
              </div>
@@ -401,20 +419,19 @@
             return () => window.removeEventListener('resize', handleResize);
           }, []);
 
-          const updateEngine = (s, canvas, isSwarm, type) => {
+          const updateEngine = (s, canvas, isSwarm) => {
             if (!canvas) return 0;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
             let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 2000 && s.targets.length < 10) {
-                s.targets.push({ x: Math.random() * cw, y: Math.random() * ch });
+                s.targets.push({ x: Math.random() * cw, y: Math.random() * ch, consumed: false });
                 s.lastSpawn = Date.now();
             }
 
             s.bots.forEach(bot => {
                 let repulseX = 0; let repulseY = 0;
                 
-                // ONLY SWARM USES SMITH & BLADE REPULSION
                 if (isSwarm) {
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
@@ -423,12 +440,12 @@
                 }
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
-                s.targets.forEach((target, index) => {
+                s.targets.forEach((target) => {
+                    if (target.consumed) return;
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    // Standard has smaller detection radius (blind wandering), Swarm has slightly better networked detection
                     const detectionRadius = isSwarm ? 150 : 50; 
                     if (dist < detectionRadius && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 20) { s.targets.splice(index, 1); foundCount++; }
+                    if (dist < 20) { target.consumed = true; foundCount++; }
                 });
 
                 bot.vx += repulseX + attractX * 1.2 + (Math.random()-0.5)*0.5;
@@ -446,10 +463,19 @@
                 }
             });
 
+            s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
             ctx.fillStyle = 'rgba(76, 5, 25, 0.4)'; ctx.fillRect(0, 0, cw, ch);
             
+            // Draw biological grid context
+            ctx.strokeStyle = 'rgba(244, 114, 182, 0.05)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let x=0; x<cw; x+=60) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
+            for(let y=0; y<ch; y+=60) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
+            ctx.stroke();
+
             s.visitedNodes.forEach(node => {
                 ctx.beginPath(); ctx.arc(node.x, node.y, 4, 0, Math.PI*2);
                 ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1500})`; ctx.fill();
@@ -469,8 +495,8 @@
           };
 
           const update = () => {
-             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false, 'std');
-             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true, 'swm');
+             const foundStd = updateEngine(simState.current.standard, canvasStandardRef.current, false);
+             const foundSwm = updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
              
              if (foundStd > 0 || foundSwm > 0) {
                  setStats(prev => ({ standard: prev.standard + foundStd, swarm: prev.swarm + foundSwm }));
@@ -481,8 +507,8 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           return (
-             <div className="flex-1 flex flex-col xl:flex-row relative overflow-hidden bg-slate-950">
-                <aside className="w-full xl:w-72 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
                   <section className="space-y-6">
                     <div className="flex items-center gap-2 mb-4">
                         <HeartPulse size={20} className="text-rose-400" />
@@ -508,17 +534,17 @@
                   </section>
                 </aside>
                 
-                <div className="flex-1 flex flex-col md:flex-row min-h-[50vh]">
-                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-rose-900/50">
+                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
+                    <div className="flex-1 relative min-h-[50%] md:min-h-0 border-b md:border-b-0 md:border-r border-rose-900/50">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
                         <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard Wandering</span>
+                            <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard</span>
                         </div>
                     </div>
-                    <div className="flex-1 relative">
+                    <div className="flex-1 relative min-h-[50%] md:min-h-0">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
                         <div className="absolute top-4 left-4 bg-rose-900/80 px-3 py-1.5 rounded-lg border border-rose-700 backdrop-blur-sm">
-                            <span className="text-xs font-bold text-rose-300 uppercase tracking-widest">Smith & Blade Swarm</span>
+                            <span className="text-xs font-bold text-rose-300 uppercase tracking-widest">Smith/Blade</span>
                         </div>
                     </div>
                 </div>
@@ -567,14 +593,13 @@
             let foundCount = 0;
 
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                s.targets.push({ x: Math.floor(Math.random() * (cw/40))*40, y: Math.floor(Math.random() * (ch/40))*40 });
+                s.targets.push({ x: Math.floor(Math.random() * (cw/40))*40, y: Math.floor(Math.random() * (ch/40))*40, consumed: false });
                 s.lastSpawn = Date.now();
             }
 
             s.bots.forEach(bot => {
                 let repulseX = 0; let repulseY = 0;
                 
-                // ONLY SWARM AVOIDS LOCAL MINIMA (Memory Repulsion)
                 if (isSwarm) {
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
@@ -583,12 +608,12 @@
                 }
 
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
-                s.targets.forEach((target, index) => {
+                s.targets.forEach((target) => {
+                    if (target.consumed) return;
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const dist = Math.sqrt(dx*dx + dy*dy);
-                    // Standard easily gets stuck, Swarm dynamically reroutes
                     const detection = isSwarm ? 200 : 80;
                     if (dist < detection && dist < minDist) { minDist = dist; attractX = dx/dist; attractY = dy/dist; }
-                    if (dist < 15) { s.targets.splice(index, 1); foundCount++; }
+                    if (dist < 15) { target.consumed = true; foundCount++; }
                 });
 
                 if (Math.random() > 0.8) { if (Math.abs(bot.vx) > Math.abs(bot.vy)) bot.vy = 0; else bot.vx = 0; }
@@ -607,12 +632,15 @@
                 }
             });
 
+            s.targets = s.targets.filter(t => !t.consumed);
             s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
 
             ctx.fillStyle = 'rgba(2, 6, 23, 0.5)'; ctx.fillRect(0, 0, cw, ch);
             ctx.strokeStyle = 'rgba(56, 189, 248, 0.05)'; ctx.lineWidth = 1;
-            for(let i=0; i<cw; i+=40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, ch); ctx.stroke(); }
-            for(let i=0; i<ch; i+=40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(cw, i); ctx.stroke(); }
+            ctx.beginPath();
+            for(let i=0; i<cw; i+=40) { ctx.moveTo(i, 0); ctx.lineTo(i, ch); }
+            for(let i=0; i<ch; i+=40) { ctx.moveTo(0, i); ctx.lineTo(cw, i); }
+            ctx.stroke();
 
             s.visitedNodes.forEach(node => {
                 ctx.beginPath(); ctx.rect(node.x-2, node.y-2, 4, 4);
@@ -654,8 +682,8 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           return (
-             <div className="flex-1 flex flex-col xl:flex-row relative overflow-hidden bg-slate-950">
-                <aside className="w-full xl:w-72 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10">
+             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 md:p-6 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
                   <section className="space-y-6">
                     <div className="flex items-center gap-2 mb-4">
                         <CpuIcon size={20} className="text-sky-400" />
@@ -680,14 +708,14 @@
                   </section>
                 </aside>
                 
-                <div className="flex-1 flex flex-col md:flex-row min-h-[50vh]">
-                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800">
+                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
+                    <div className="flex-1 relative min-h-[50%] md:min-h-0 border-b md:border-b-0 md:border-r border-slate-800">
                         <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
                         <div className="absolute top-4 left-4 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700 backdrop-blur-sm">
                             <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">Standard Descend</span>
                         </div>
                     </div>
-                    <div className="flex-1 relative">
+                    <div className="flex-1 relative min-h-[50%] md:min-h-0">
                         <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
                         <div className="absolute top-4 left-4 bg-sky-900/80 px-3 py-1.5 rounded-lg border border-sky-700 backdrop-blur-sm">
                             <span className="text-xs font-bold text-sky-300 uppercase tracking-widest">Swarm Optimization</span>
@@ -705,7 +733,7 @@
           const [activeTab, setActiveTab] = useState(1);
 
           return (
-            <div className="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden">
+            <div className="flex flex-col h-[100dvh] bg-slate-950 text-slate-100 font-sans overflow-hidden">
               <header className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-3 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md z-20 gap-4 shadow-xl">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
@@ -735,7 +763,7 @@
                 </div>
               </header>
 
-              <main className="flex-1 flex flex-col relative overflow-hidden">
+              <main className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
                 {activeTab === 1 && <BilliardSim />}
                 {activeTab === 2 && <ZetaSwarmSim />}
                 {activeTab === 3 && <MedicalSim />}
