@@ -32,6 +32,16 @@
         const CpuIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>;
 
         // ==========================================
+        // UTILS
+        // ==========================================
+        const getPrimeFactorizationString = (n) => {
+            const factors = { 6: "3 x 2", 10: "5 x 2", 12: "3 x 2 x 2", 14: "7 x 2", 20: "5 x 2 x 2", 24: "3 x 2 x 2 x 2", 28: "7 x 2 x 2" };
+            return factors[n] || "Assimilated";
+        };
+        const compositeTargets = [6, 10, 12, 14, 20, 24, 28]; // Even states to be assimilated
+        const structuralPrimes = [3, 5, 7]; // Healthy structural bases
+
+        // ==========================================
         // TAB 1: BILLIARD INVERSION (RESPONSIVE)
         // ==========================================
         const BilliardSim = () => {
@@ -299,8 +309,15 @@
             }
 
             if (s.initialized) {
+                // Spawn composite (even) target nodes for processing
                 if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 25) {
-                    s.zetaTargets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false });
+                    const anomalyVal = compositeTargets[Math.floor(Math.random() * compositeTargets.length)];
+                    s.zetaTargets.push({ 
+                        x: 20 + Math.random()*(cw-40), 
+                        y: 20 + Math.random()*(ch-40), 
+                        consumed: false,
+                        val: anomalyVal
+                    });
                     s.lastSpawn = Date.now();
                 }
 
@@ -316,11 +333,13 @@
                         if (target.consumed) return; 
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 1.5; attractY = (dy/dist) * 1.5; }
+                        
+                        // Assimilate Even Numbers
                         if (distSq < 400) { 
                             target.consumed = true; 
                             s.zetaCount += 1; 
-                            const simulatedT = (14.134725 + (Math.random() * 100)).toFixed(5);
-                            s.newLogs.push({ id: Math.random().toString(), text: `ζ(½ + ${simulatedT}i) verified` });
+                            const factorization = getPrimeFactorizationString(target.val);
+                            s.newLogs.push({ id: Math.random().toString(), text: `Anomaly [${target.val}] assimilated -> ${factorization}` });
                         } 
                     });
 
@@ -394,7 +413,7 @@
                     </div>
 
                     <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-600 shadow-lg">
-                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Zeta Targets Mapped</div>
+                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Prime Compression Check</div>
                         <div className="text-3xl font-mono text-emerald-400">{zetaSorted.toLocaleString()}</div>
                     </div>
 
@@ -403,10 +422,10 @@
                         <div className="font-mono text-[10px] text-sky-400/80 space-y-1 overflow-hidden flex flex-col justify-end flex-1">
                             {dataLog.map((log, i) => (
                                 <div key={log.id} className={`truncate ${i === 0 ? 'text-sky-300 font-bold' : ''}`}>
-                                    > {log.text}
+                                    {log.text}
                                 </div>
                             ))}
-                            {dataLog.length === 0 && <div className="text-slate-600 italic">Waiting for target consumption...</div>}
+                            {dataLog.length === 0 && <div className="text-slate-600 italic">Waiting for composite target...</div>}
                         </div>
                     </div>
                   </section>
@@ -431,26 +450,29 @@
           const canvasSwarmRef = useRef(null);
           const requestRef = useRef(null);
           
-          const [stats, setStats] = useState({ standard: {hits: 0, cols: 0}, swarm: {hits: 0, cols: 0} });
+          const [stats, setStats] = useState({ standard: {hits: 0, cols: 0, damage: 0}, swarm: {hits: 0, cols: 0, damage: 0} });
           const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, cols: 0, init: false },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, cols: 0, init: false }
+            standard: { bots: [], visitedNodes: [], targets: [], healthy: [], lastSpawn: 0, hits: 0, cols: 0, damage: 0, init: false },
+            swarm: { bots: [], visitedNodes: [], targets: [], healthy: [], lastSpawn: 0, hits: 0, cols: 0, damage: 0, init: false }
           });
 
           useEffect(() => {
             const saved = JSON.parse(localStorage.getItem('genesis_medical') || '{}');
             simState.current.standard.hits = saved.standardHits || 0;
             simState.current.standard.cols = saved.standardCols || 0;
+            simState.current.standard.damage = saved.standardDamage || 0;
             simState.current.swarm.hits = saved.swarmHits || 0;
             simState.current.swarm.cols = saved.swarmCols || 0;
+            simState.current.swarm.damage = saved.swarmDamage || 0;
+            
             const syncInterval = setInterval(() => {
                 setStats({ 
-                    standard: {hits: simState.current.standard.hits, cols: simState.current.standard.cols}, 
-                    swarm: {hits: simState.current.swarm.hits, cols: simState.current.swarm.cols} 
+                    standard: {hits: simState.current.standard.hits, cols: simState.current.standard.cols, damage: simState.current.standard.damage}, 
+                    swarm: {hits: simState.current.swarm.hits, cols: simState.current.swarm.cols, damage: simState.current.swarm.damage} 
                 });
                 localStorage.setItem('genesis_medical', JSON.stringify({ 
-                    standardHits: simState.current.standard.hits, standardCols: simState.current.standard.cols,
-                    swarmHits: simState.current.swarm.hits, swarmCols: simState.current.swarm.cols 
+                    standardHits: simState.current.standard.hits, standardCols: simState.current.standard.cols, standardDamage: simState.current.standard.damage,
+                    swarmHits: simState.current.swarm.hits, swarmCols: simState.current.swarm.cols, swarmDamage: simState.current.swarm.damage 
                 }));
             }, 300);
             return () => clearInterval(syncInterval);
@@ -471,7 +493,6 @@
             if (!canvas) return;
             const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
 
-            // Complex Interlocking Vein Obstacles
             const obstacles = [
                 { x: cw * 0.2, y: 0, w: cw * 0.05, h: ch * 0.4 }, 
                 { x: cw * 0.2, y: ch * 0.6, w: cw * 0.05, h: ch * 0.4 },
@@ -481,13 +502,19 @@
             ];
 
             if (!s.init && cw > 0 && ch > 0) {
-                s.bots = [];
+                s.bots = []; s.healthy = [];
+                // 4x Scale: Bots are tiny (size 2), 15 per side.
                 for(let i=0; i<15; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: isSwarm ? '#34d399' : '#fb923c', size: 2 });
+                
+                // Spawn Healthy Structural Primes (3, 5, 7)
+                for(let i=0; i<25; i++) {
+                    s.healthy.push({ x: Math.random()*cw, y: Math.random()*ch, val: structuralPrimes[Math.floor(Math.random()*3)], cooldown: 0 });
+                }
                 s.init = true;
             }
             if (!s.init) return;
 
-            // Spawn Targets explicitly hidden in far corners/pockets
+            // Spawn Anomalies (Cancerous Evens) explicitly hidden in far corners
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
                 const corners = [
                     { x: cw * 0.05, y: ch * 0.1 }, { x: cw * 0.95, y: ch * 0.1 },
@@ -503,39 +530,59 @@
                 s.lastSpawn = Date.now();
             }
 
+            // Tick Healthy Node Cooldowns
+            s.healthy.forEach(h => { if(h.cooldown > 0) h.cooldown--; });
+
             s.bots.forEach(bot => {
                 let repulseX = 0; let repulseY = 0;
                 let attractX = 0; let attractY = 0; let minDist = Infinity;
                 let hitWall = false;
                 
                 if (isSwarm) {
+                    // Swarm Memory Repulsion
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.3; repulseY += (dy/dist) * 0.3; }
                     });
+
+                    // Swarm perfectly maps/repels from Healthy Structural Primes (zero damage)
+                    s.healthy.forEach(node => {
+                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 2500) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.8; repulseY += (dy/dist) * 0.8; }
+                    });
                     
+                    // Swarm actively targets anomalies
                     s.targets.forEach((target) => {
                         if (target.consumed) return;
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.5; attractY = (dy/dist) * 2.5; }
+                        if (distSq < 60000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 3.0; attractY = (dy/dist) * 3.0; }
                     });
 
                     // Holographic Boundary Prediction (Steer away BEFORE hitting wall to save compute)
                     if (bot.x < 15) bot.vx += 0.5; else if (bot.x > cw - 15) bot.vx -= 0.5;
                     if (bot.y < 15) bot.vy += 0.5; else if (bot.y > ch - 15) bot.vy -= 0.5;
-                    
                     obstacles.forEach(obs => {
                         if (bot.x > obs.x - 15 && bot.x < obs.x + obs.w + 15 && bot.y > obs.y - 15 && bot.y < obs.y + obs.h + 15) {
                             if (bot.x < obs.x) bot.vx -= 0.6; else if (bot.x > obs.x + obs.w) bot.vx += 0.6;
                             if (bot.y < obs.y) bot.vy -= 0.6; else if (bot.y > obs.y + obs.h) bot.vy += 0.6;
                         }
                     });
+                } else {
+                    // Standard Method: Blindly bounces off healthy cells causing damage
+                    s.healthy.forEach(node => {
+                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
+                        if (distSq < 100 && node.cooldown === 0) { 
+                            bot.vx *= -1; bot.vy *= -1; // Hard bounce 
+                            s.damage += 1; 
+                            node.cooldown = 30; // Prevent spamming damage on a single node
+                        }
+                    });
                 }
 
+                // Check Anomalous Targets
                 s.targets.forEach((target) => {
                     if (target.consumed) return;
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                    // Standard must practically step on it (dist < 8). Swarm has better alignment (dist < 15)
                     if (distSq < (isSwarm ? 225 : 64)) { target.consumed = true; s.hits += 1; }
                 });
 
@@ -584,6 +631,13 @@
             ctx.lineWidth = 1;
             obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
 
+            // Draw Healthy Structural Primes
+            s.healthy.forEach(h => {
+                ctx.beginPath(); ctx.arc(h.x, h.y, 4, 0, Math.PI*2);
+                ctx.fillStyle = h.cooldown > 0 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(52, 211, 153, 0.4)'; // Flash red if damaged
+                ctx.fill();
+            });
+
             if (isSwarm) {
                 s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 3, 0, Math.PI*2); ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1000})`; ctx.fill(); });
                 ctx.lineWidth = 0.5;
@@ -608,46 +662,50 @@
           useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
 
           const handleReset = () => {
-             simState.current.standard.hits = 0; simState.current.standard.cols = 0;
-             simState.current.swarm.hits = 0; simState.current.swarm.cols = 0;
+             simState.current.standard.hits = 0; simState.current.standard.cols = 0; simState.current.standard.damage = 0;
+             simState.current.swarm.hits = 0; simState.current.swarm.cols = 0; simState.current.swarm.damage = 0;
              simState.current.standard.targets = []; simState.current.swarm.targets = [];
-             setStats({ standard: {hits: 0, cols: 0}, swarm: {hits: 0, cols: 0} });
-             localStorage.setItem('genesis_medical', JSON.stringify({ standardHits: 0, standardCols: 0, swarmHits: 0, swarmCols: 0 }));
+             setStats({ standard: {hits: 0, cols: 0, damage: 0}, swarm: {hits: 0, cols: 0, damage: 0} });
+             localStorage.setItem('genesis_medical', JSON.stringify({ standardHits: 0, standardCols: 0, standardDamage: 0, swarmHits: 0, swarmCols: 0, swarmDamage: 0 }));
           };
 
           return (
              <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[40%] xl:max-h-none flex flex-col">
+                  <section className="space-y-3 flex-1">
+                    <div className="flex items-center gap-2">
                         <HeartPulse size={18} className="text-rose-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
                     </div>
-                    <div className="p-3 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Watch Chaos waste compute bouncing blindly in veins. Swarm predicts boundaries to avoid collisions while hunting.
+                    <div className="p-2 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
+                        <p className="text-[9px] text-slate-400 leading-relaxed">
+                            Watch Chaos blindly damage structural Primes (Green). Swarm maps anomalies and actively avoids healthy structures.
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-                        <div className="p-3 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
-                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-2 border-b border-orange-700/50 pb-1">M1: Random Chaos</div>
-                            <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Targets</div><div className="text-lg font-mono text-white leading-none">{stats.standard.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-red-400 uppercase">Collisions</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.cols}</div></div>
+                    <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+                        <div className="p-2 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
+                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-1 border-b border-orange-700/50 pb-1">M1: Random Chaos</div>
+                            <div className="grid grid-cols-3 gap-1">
+                                <div><div className="text-[8px] text-slate-400 uppercase">Killed</div><div className="text-sm font-mono text-white leading-none">{stats.standard.hits}</div></div>
+                                <div><div className="text-[8px] text-orange-400 uppercase">Wasted</div><div className="text-sm font-mono text-orange-400 leading-none">{stats.standard.cols}</div></div>
+                                <div><div className="text-[8px] text-red-400 uppercase font-bold">Cell Dmg</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.damage}</div></div>
                             </div>
                         </div>
-                        <div className="p-3 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
-                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-2 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
-                            <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Targets</div><div className="text-lg font-mono text-white leading-none">{stats.swarm.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-emerald-400 uppercase">Collisions</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
+                        <div className="p-2 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
+                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
+                            <div className="grid grid-cols-3 gap-1">
+                                <div><div className="text-[8px] text-slate-400 uppercase">Killed</div><div className="text-sm font-mono text-white leading-none">{stats.swarm.hits}</div></div>
+                                <div><div className="text-[8px] text-emerald-400 uppercase">Wasted</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
+                                <div><div className="text-[8px] text-emerald-200 uppercase font-bold">Cell Dmg</div><div className="text-sm font-mono text-emerald-200 leading-none">{stats.swarm.damage}</div></div>
                             </div>
                         </div>
                     </div>
-                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-rose-800 hover:bg-rose-800/50 text-rose-300 font-semibold text-xs transition-colors">
+                  </section>
+                  <div className="pt-2 mt-auto">
+                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-rose-800 hover:bg-rose-800/50 text-rose-300 font-semibold text-xs transition-colors">
                         <RefreshCw size={12} /> Reset A/B Stats
                     </button>
-                  </section>
+                  </div>
                 </aside>
                 
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
@@ -849,37 +907,39 @@
 
           return (
              <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
-                  <section className="space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
+                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[40%] xl:max-h-none flex flex-col">
+                  <section className="space-y-3 flex-1">
+                    <div className="flex items-center gap-2">
                         <CpuIcon size={18} className="text-sky-400" />
                         <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Deep Learning</h2>
                     </div>
-                    <div className="p-3 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
-                        <p className="text-[10px] text-slate-400 leading-relaxed">
-                            Watch Chaos waste compute bouncing blindly in traps. Swarm predicts boundaries to avoid collisions while hunting.
+                    <div className="p-2 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
+                        <p className="text-[9px] text-slate-400 leading-relaxed">
+                            Left: Blind GD gets trapped in Local Minima and wastes compute. Right: Swarm shares memory to actively route around traps.
                         </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-1">
-                        <div className="p-3 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
-                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-2 border-b border-orange-700/50 pb-1">M1: Blind GD</div>
+                    <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
+                        <div className="p-2 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
+                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-1 border-b border-orange-700/50 pb-1">M1: Blind GD</div>
                             <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Targets</div><div className="text-lg font-mono text-white leading-none">{stats.standard.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-red-400 uppercase">Collisions</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.cols}</div></div>
+                                <div><div className="text-[8px] text-slate-400 uppercase">Minima Reached</div><div className="text-sm font-mono text-white leading-none">{stats.standard.hits}</div></div>
+                                <div className="text-right"><div className="text-[8px] text-red-400 uppercase">Wasted Cycles</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.cols}</div></div>
                             </div>
                         </div>
-                        <div className="p-3 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
-                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-2 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
+                        <div className="p-2 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
+                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
                             <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Targets</div><div className="text-lg font-mono text-white leading-none">{stats.swarm.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-emerald-400 uppercase">Collisions</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
+                                <div><div className="text-[8px] text-slate-400 uppercase">Minima Reached</div><div className="text-sm font-mono text-white leading-none">{stats.swarm.hits}</div></div>
+                                <div className="text-right"><div className="text-[8px] text-emerald-400 uppercase">Wasted Cycles</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
                             </div>
                         </div>
                     </div>
-                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-sky-800 hover:bg-sky-800/50 text-sky-300 font-semibold text-xs transition-colors">
+                  </section>
+                  <div className="pt-2 mt-auto">
+                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-sky-800 hover:bg-sky-800/50 text-sky-300 font-semibold text-xs transition-colors">
                         <RefreshCw size={12} /> Reset A/B Stats
                     </button>
-                  </section>
+                  </div>
                 </aside>
                 
                 <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
