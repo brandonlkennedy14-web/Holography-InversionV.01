@@ -42,12 +42,15 @@
         const structuralPrimes = [3, 5, 7]; // Healthy structural bases
 
         // ==========================================
-        // TAB 1: BILLIARD INVERSION (RESPONSIVE)
+        // TAB 1: BILLIARD INVERSION (MULTI-SIM HOLOGRAPHY)
         // ==========================================
         const BilliardSim = () => {
           const [isRunning, setIsRunning] = useState(false);
           const [inversionRadius, setInversionRadius] = useState(100);
           const [speed, setSpeed] = useState(2);
+          const [particleCount, setParticleCount] = useState(3);
+          const [trailMemory, setTrailMemory] = useState(3000);
+          const [boundaryScale, setBoundaryScale] = useState(55); // 0.55 converted to % for UI
           const [showInversionCircle, setShowInversionCircle] = useState(true);
           const [showDynamicGrid, setShowDynamicGrid] = useState(true);
           
@@ -58,8 +61,7 @@
           const canvasRef = useRef(null);
           const requestRef = useRef(null);
           const stateRef = useRef({ 
-            pos: { x: null, y: null }, vel: { x: 1.8, y: 1.3 }, 
-            stdPath: [], invPath: [], gridPhase: 0,
+            particles: [], gridPhase: 0,
             winding: 0, corners: 0, configs: 0 
           });
 
@@ -85,9 +87,8 @@
               if (canvas.parentElement) { 
                 canvas.width = canvas.parentElement.clientWidth; 
                 canvas.height = canvas.parentElement.clientHeight; 
-                if (!stateRef.current.pos.x) {
-                  stateRef.current.pos = { x: canvas.width/2, y: canvas.height/2 };
-                }
+                // Force re-init of particles on resize to center them
+                stateRef.current.particles = [];
               }
             };
             window.addEventListener('resize', handleResize);
@@ -109,41 +110,66 @@
             const cw = canvas.width; const ch = canvas.height;
             const cx = cw / 2; const cy = ch / 2; 
             
-            const boundSize = Math.min(cw, ch) * 0.55; 
+            const boundSize = Math.min(cw, ch) * (boundaryScale / 100); 
             const halfSize = boundSize / 2;
-            const trailLength = 3000;
 
-            if (s.pos.x === null) s.pos = { x: cx, y: cy };
-
-            for (let i = 0; i < speed; i++) {
-              s.pos.x += s.vel.x; s.pos.y += s.vel.y;
-              
-              const left = cx - halfSize; const right = cx + halfSize; 
-              const top = cy - halfSize; const bottom = cy + halfSize;
-              let hitCornerX = false; let hitCornerY = false;
-
-              if (s.pos.x <= left) { s.vel.x *= -1; s.pos.x = left + 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
-              else if (s.pos.x >= right) { s.vel.x *= -1; s.pos.x = right - 1; hitCornerX = Math.abs(s.pos.y - top) < 15 || Math.abs(s.pos.y - bottom) < 15; }
-              
-              if (s.pos.y <= top) { s.vel.y *= -1; s.pos.y = top + 1; hitCornerY = Math.abs(s.pos.x - left) < 15 || Math.abs(s.pos.x - right) < 15; }
-              else if (s.pos.y >= bottom) { s.vel.y *= -1; s.pos.y = bottom - 1; hitCornerY = Math.abs(s.pos.x - left) < 15 || Math.abs(s.pos.x - right) < 15; }
-
-              if (hitCornerX || hitCornerY) {
-                s.corners += 1;
-                s.winding += (s.vel.x * s.vel.y > 0 ? 1 : -1);
-              }
-
-              s.stdPath.push({x: s.pos.x, y: s.pos.y});
-              if (s.stdPath.length > trailLength) s.stdPath.shift();
-
-              const inverted = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
-              s.invPath.push(inverted);
-              if (s.invPath.length > trailLength) s.invPath.shift();
+            // Initialize or adjust particle count dynamically
+            if (s.particles.length !== particleCount) {
+                const currentCount = s.particles.length;
+                if (currentCount < particleCount) {
+                    const vels = [{x: 1.8, y: 1.3}, {x: -1.5, y: 1.7}, {x: 1.6, y: -1.4}];
+                    const colors = [
+                        { std: '#38bdf8', inv: ['rgba(56, 189, 248, 0.8)', 'rgba(56, 189, 248, 0.1)'] }, // Cyan
+                        { std: '#f472b6', inv: ['rgba(236, 72, 153, 0.8)', 'rgba(236, 72, 153, 0.1)'] }, // Pink
+                        { std: '#fbbf24', inv: ['rgba(251, 191, 36, 0.8)', 'rgba(251, 191, 36, 0.1)'] }  // Amber
+                    ];
+                    for(let i=currentCount; i<particleCount; i++) {
+                        s.particles.push({
+                            pos: { x: cx, y: cy },
+                            vel: vels[i % 3],
+                            color: colors[i % 3],
+                            stdPath: [], invPath: []
+                        });
+                    }
+                } else {
+                    s.particles = s.particles.slice(0, particleCount);
+                }
             }
 
-            s.gridPhase += 0.05 * speed;
-            s.configs += Math.floor(speed * 4); 
+            // Move & Bounce Physics for all active particles
+            s.particles.forEach(p => {
+                for (let i = 0; i < speed; i++) {
+                  p.pos.x += p.vel.x; p.pos.y += p.vel.y;
+                  
+                  const left = cx - halfSize; const right = cx + halfSize; 
+                  const top = cy - halfSize; const bottom = cy + halfSize;
+                  let hitCornerX = false; let hitCornerY = false;
 
+                  if (p.pos.x <= left) { p.vel.x *= -1; p.pos.x = left + 1; hitCornerX = Math.abs(p.pos.y - top) < 15 || Math.abs(p.pos.y - bottom) < 15; }
+                  else if (p.pos.x >= right) { p.vel.x *= -1; p.pos.x = right - 1; hitCornerX = Math.abs(p.pos.y - top) < 15 || Math.abs(p.pos.y - bottom) < 15; }
+                  
+                  if (p.pos.y <= top) { p.vel.y *= -1; p.pos.y = top + 1; hitCornerY = Math.abs(p.pos.x - left) < 15 || Math.abs(p.pos.x - right) < 15; }
+                  else if (p.pos.y >= bottom) { p.vel.y *= -1; p.pos.y = bottom - 1; hitCornerY = Math.abs(p.pos.x - left) < 15 || Math.abs(p.pos.x - right) < 15; }
+
+                  if (hitCornerX || hitCornerY) {
+                    s.corners += 1;
+                    s.winding += (p.vel.x * p.vel.y > 0 ? 1 : -1);
+                  }
+
+                  p.stdPath.push({x: p.pos.x, y: p.pos.y});
+                  if (p.stdPath.length > trailMemory) p.stdPath.shift();
+
+                  const inverted = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
+                  p.invPath.push(inverted);
+                  if (p.invPath.length > trailMemory) p.invPath.shift();
+                }
+            });
+
+            // Config metric scales with particle count and speed
+            s.gridPhase += 0.05 * speed;
+            s.configs += Math.floor(speed * 4 * particleCount); 
+
+            // Rendering
             ctx.clearRect(0, 0, cw, ch);
 
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -173,26 +199,32 @@
             ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
             ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
 
-            if (s.stdPath.length > 1) {
-              ctx.beginPath(); ctx.moveTo(s.stdPath[0].x, s.stdPath[0].y);
-              for (let i = 1; i < s.stdPath.length; i++) ctx.lineTo(s.stdPath[i].x, s.stdPath[i].y);
-              ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)'; ctx.lineWidth = 1; ctx.stroke();
-            }
+            // Draw all active particle artifacts
+            s.particles.forEach(p => {
+                // Std Path
+                if (p.stdPath.length > 1) {
+                  ctx.beginPath(); ctx.moveTo(p.stdPath[0].x, p.stdPath[0].y);
+                  for (let i = 1; i < p.stdPath.length; i++) ctx.lineTo(p.stdPath[i].x, p.stdPath[i].y);
+                  ctx.strokeStyle = p.color.std + '60'; ctx.lineWidth = 1; ctx.stroke();
+                }
 
-            if (s.invPath.length > 1) {
-              ctx.beginPath(); ctx.moveTo(s.invPath[0].x, s.invPath[0].y);
-              for (let i = 1; i < s.invPath.length; i++) ctx.lineTo(s.invPath[i].x, s.invPath[i].y);
-              const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
-              gradient.addColorStop(0, 'rgba(139, 92, 246, 0.8)'); gradient.addColorStop(1, 'rgba(236, 72, 153, 0.1)');
-              ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
-            }
+                // Inv Path (Holographic Overlap)
+                if (p.invPath.length > 1) {
+                  ctx.beginPath(); ctx.moveTo(p.invPath[0].x, p.invPath[0].y);
+                  for (let i = 1; i < p.invPath.length; i++) ctx.lineTo(p.invPath[i].x, p.invPath[i].y);
+                  const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
+                  gradient.addColorStop(0, p.color.inv[0]); gradient.addColorStop(1, p.color.inv[1]);
+                  ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
+                }
 
-            ctx.beginPath(); ctx.arc(s.pos.x, s.pos.y, 4, 0, Math.PI * 2);
-            ctx.fillStyle = '#38bdf8'; ctx.fill(); 
+                // Points
+                ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = p.color.std; ctx.fill(); 
 
-            const currentInv = invertPoint(s.pos.x, s.pos.y, cx, cy, inversionRadius);
-            ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#f472b6'; ctx.shadowBlur = 10; ctx.shadowColor = '#f472b6'; ctx.fill(); ctx.shadowBlur = 0;
+                const currentInv = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
+                ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = p.color.inv[0].replace('0.8', '1.0'); ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.fill(); ctx.shadowBlur = 0;
+            });
 
             requestRef.current = requestAnimationFrame(update);
           };
@@ -201,10 +233,10 @@
             if (isRunning) requestRef.current = requestAnimationFrame(update);
             else if (requestRef.current) cancelAnimationFrame(requestRef.current);
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning, speed, inversionRadius, showDynamicGrid]);
+          }, [isRunning, speed, inversionRadius, particleCount, boundaryScale, trailMemory, showDynamicGrid]);
 
           const handleReset = () => {
-             stateRef.current.stdPath = []; stateRef.current.invPath = []; 
+             stateRef.current.particles.forEach(p => { p.stdPath = []; p.invPath = []; p.pos = {x: canvasRef.current.width/2, y: canvasRef.current.height/2}; }); 
              stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0;
              setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0);
              localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 }));
@@ -212,7 +244,7 @@
 
           return (
             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[35%] md:max-h-none">
+                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
                   <section className="space-y-4">
                     <div className="flex justify-between items-center mb-2">
                         <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">Controls</h2>
@@ -220,8 +252,20 @@
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-1">
+                          <div className="flex justify-between text-xs"><label className="text-slate-400">Active Simulators</label><span className="text-indigo-400 font-mono">{particleCount}</span></div>
+                          <input type="range" min="1" max="3" value={particleCount} onChange={(e) => setParticleCount(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                        <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Inversion Radius</label><span className="text-indigo-400 font-mono">{inversionRadius}px</span></div>
                           <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs"><label className="text-slate-400">Boundary Scale</label><span className="text-indigo-400 font-mono">{boundaryScale}%</span></div>
+                          <input type="range" min="30" max="90" value={boundaryScale} onChange={(e) => setBoundaryScale(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs"><label className="text-slate-400">Trail Memory</label><span className="text-indigo-400 font-mono">{trailMemory}</span></div>
+                          <input type="range" min="500" max="8000" step="500" value={trailMemory} onChange={(e) => setTrailMemory(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Speed</label><span className="text-indigo-400 font-mono">x{speed}</span></div>
@@ -244,8 +288,8 @@
                   <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
                     <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl min-w-[200px] shadow-2xl">
                       <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Free Configs</span><span className="text-sky-400 font-mono">{configsRegistered.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Winding</span><span className="text-emerald-400 font-mono">{windingNumber}</span></div>
-                      <div className="flex justify-between text-xs"><span className="text-slate-500">Corners</span><span className="text-amber-400 font-mono">{cornerHits}</span></div>
+                      <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Agg. Winding</span><span className="text-emerald-400 font-mono">{windingNumber}</span></div>
+                      <div className="flex justify-between text-xs"><span className="text-slate-500">Agg. Corners</span><span className="text-amber-400 font-mono">{cornerHits}</span></div>
                     </div>
                   </div>
                 </div>
