@@ -30,6 +30,7 @@
         const NetworkIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>;
         const HeartPulse = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"></path></svg>;
         const CpuIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>;
+        const MonitorIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>;
 
         // ==========================================
         // PRIME MATH UTILS
@@ -42,7 +43,7 @@
         const structuralPrimes = [3, 5, 7]; // Healthy structural bases
 
         // ==========================================
-        // TAB 1: BILLIARD INVERSION (MULTI-SIM HOLOGRAPHY)
+        // TAB 1: BILLIARD INVERSION (MULTI-SIM & 3D HOLOGRAPHY)
         // ==========================================
         const BilliardSim = () => {
           const [isRunning, setIsRunning] = useState(false);
@@ -50,9 +51,10 @@
           const [speed, setSpeed] = useState(2);
           const [particleCount, setParticleCount] = useState(3);
           const [trailMemory, setTrailMemory] = useState(3000);
-          const [boundaryScale, setBoundaryScale] = useState(55); // 0.55 converted to % for UI
+          const [boundaryScale, setBoundaryScale] = useState(30); // Lower default for Pyramid mode
           const [showInversionCircle, setShowInversionCircle] = useState(true);
           const [showDynamicGrid, setShowDynamicGrid] = useState(true);
+          const [showHologram3D, setShowHologram3D] = useState(false);
           
           const [windingNumber, setWindingNumber] = useState(0);
           const [cornerHits, setCornerHits] = useState(0);
@@ -87,7 +89,6 @@
               if (canvas.parentElement) { 
                 canvas.width = canvas.parentElement.clientWidth; 
                 canvas.height = canvas.parentElement.clientHeight; 
-                // Force re-init of particles on resize to center them
                 stateRef.current.particles = [];
               }
             };
@@ -113,7 +114,6 @@
             const boundSize = Math.min(cw, ch) * (boundaryScale / 100); 
             const halfSize = boundSize / 2;
 
-            // Initialize or adjust particle count dynamically
             if (s.particles.length !== particleCount) {
                 const currentCount = s.particles.length;
                 if (currentCount < particleCount) {
@@ -136,7 +136,6 @@
                 }
             }
 
-            // Move & Bounce Physics for all active particles
             s.particles.forEach(p => {
                 for (let i = 0; i < speed; i++) {
                   p.pos.x += p.vel.x; p.pos.y += p.vel.y;
@@ -165,20 +164,38 @@
                 }
             });
 
-            // Config metric scales with particle count and speed
             s.gridPhase += 0.05 * speed;
             s.configs += Math.floor(speed * 4 * particleCount); 
 
-            // Rendering
             ctx.clearRect(0, 0, cw, ch);
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+            // Background Grid
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
             ctx.lineWidth = 1; ctx.beginPath();
             for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
             for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
             ctx.stroke();
 
-            if (showDynamicGrid) {
+            // 3D Pepper's Ghost Base Alignment Marks
+            if (showHologram3D) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
+                ctx.beginPath();
+                ctx.moveTo(cx - halfSize, cy - halfSize); ctx.lineTo(cx + halfSize, cy + halfSize);
+                ctx.moveTo(cx + halfSize, cy - halfSize); ctx.lineTo(cx - halfSize, cy + halfSize);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw Projection Zone Guides
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.strokeRect(cx - halfSize, cy + halfSize, boundSize, boundSize); // Bottom
+                ctx.strokeRect(cx - halfSize, cy - halfSize - boundSize, boundSize, boundSize); // Top
+                ctx.strokeRect(cx + halfSize, cy - halfSize, boundSize, boundSize); // Right
+                ctx.strokeRect(cx - halfSize - boundSize, cy - halfSize, boundSize, boundSize); // Left
+            }
+
+            if (showDynamicGrid && !showHologram3D) {
               ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; 
               ctx.lineWidth = 1; ctx.beginPath();
               const phaseOffset = Math.sin(s.gridPhase) * 20;
@@ -191,39 +208,60 @@
               ctx.stroke();
             }
 
-            if (showInversionCircle) {
+            if (showInversionCircle && !showHologram3D) {
               ctx.beginPath(); ctx.arc(cx, cy, inversionRadius, 0, Math.PI * 2);
               ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
             }
 
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
-            ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
+            if (!showHologram3D) {
+              ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+              ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
+            }
 
-            // Draw all active particle artifacts
             s.particles.forEach(p => {
-                // Std Path
-                if (p.stdPath.length > 1) {
-                  ctx.beginPath(); ctx.moveTo(p.stdPath[0].x, p.stdPath[0].y);
-                  for (let i = 1; i < p.stdPath.length; i++) ctx.lineTo(p.stdPath[i].x, p.stdPath[i].y);
-                  ctx.strokeStyle = p.color.std + '60'; ctx.lineWidth = 1; ctx.stroke();
+                if (!showHologram3D) {
+                    // Standard Trails
+                    if (p.stdPath.length > 1) {
+                      ctx.beginPath(); ctx.moveTo(p.stdPath[0].x, p.stdPath[0].y);
+                      for (let i = 1; i < p.stdPath.length; i++) ctx.lineTo(p.stdPath[i].x, p.stdPath[i].y);
+                      ctx.strokeStyle = p.color.std + '60'; ctx.lineWidth = 1; ctx.stroke();
+                    }
+
+                    // Inverted Holographic Overlap Trails
+                    if (p.invPath.length > 1) {
+                      ctx.beginPath(); ctx.moveTo(p.invPath[0].x, p.invPath[0].y);
+                      for (let i = 1; i < p.invPath.length; i++) ctx.lineTo(p.invPath[i].x, p.invPath[i].y);
+                      const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
+                      gradient.addColorStop(0, p.color.inv[0]); gradient.addColorStop(1, p.color.inv[1]);
+                      ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
+                    }
+
+                    // Base Particle
+                    ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color.std; ctx.fill(); 
+
+                    // Inverted Particle
+                    const currentInv = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
+                    ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color.inv[0].replace('0.8', '1.0'); ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.fill(); ctx.shadowBlur = 0;
+                } else {
+                    // 3D HOLOGRAM PROJECTION LOGIC (PEPPER'S GHOST)
+                    const dx = p.pos.x - cx;
+                    const dy = p.pos.y - cy;
+                    
+                    const drawProjectedOrb = (px, py, colorStr) => {
+                        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2);
+                        ctx.fillStyle = colorStr;
+                        ctx.shadowBlur = 15; ctx.shadowColor = colorStr; ctx.fill(); ctx.shadowBlur = 0;
+                        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px-1, py-1, 2, 0, Math.PI*2); ctx.fill(); 
+                    };
+
+                    // 4-Way Rotational Projection Matrix mapping center square to outer bounds
+                    drawProjectedOrb(cx + dx, cy + boundSize + dy, p.color.std); // Bottom Projection
+                    drawProjectedOrb(cx - dx, cy - boundSize - dy, p.color.std); // Top Projection
+                    drawProjectedOrb(cx + boundSize + dy, cy + dx, p.color.std); // Right Projection
+                    drawProjectedOrb(cx - boundSize - dy, cy - dx, p.color.std); // Left Projection
                 }
-
-                // Inv Path (Holographic Overlap)
-                if (p.invPath.length > 1) {
-                  ctx.beginPath(); ctx.moveTo(p.invPath[0].x, p.invPath[0].y);
-                  for (let i = 1; i < p.invPath.length; i++) ctx.lineTo(p.invPath[i].x, p.invPath[i].y);
-                  const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
-                  gradient.addColorStop(0, p.color.inv[0]); gradient.addColorStop(1, p.color.inv[1]);
-                  ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
-                }
-
-                // Points
-                ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
-                ctx.fillStyle = p.color.std; ctx.fill(); 
-
-                const currentInv = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
-                ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = p.color.inv[0].replace('0.8', '1.0'); ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.fill(); ctx.shadowBlur = 0;
             });
 
             requestRef.current = requestAnimationFrame(update);
@@ -233,7 +271,7 @@
             if (isRunning) requestRef.current = requestAnimationFrame(update);
             else if (requestRef.current) cancelAnimationFrame(requestRef.current);
             return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning, speed, inversionRadius, particleCount, boundaryScale, trailMemory, showDynamicGrid]);
+          }, [isRunning, speed, inversionRadius, particleCount, boundaryScale, trailMemory, showDynamicGrid, showHologram3D]);
 
           const handleReset = () => {
              stateRef.current.particles.forEach(p => { p.stdPath = []; p.invPath = []; p.pos = {x: canvasRef.current.width/2, y: canvasRef.current.height/2}; }); 
@@ -257,15 +295,15 @@
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Inversion Radius</label><span className="text-indigo-400 font-mono">{inversionRadius}px</span></div>
-                          <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                          <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" disabled={showHologram3D} />
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Boundary Scale</label><span className="text-indigo-400 font-mono">{boundaryScale}%</span></div>
-                          <input type="range" min="30" max="90" value={boundaryScale} onChange={(e) => setBoundaryScale(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                          <input type="range" min="20" max="90" value={boundaryScale} onChange={(e) => setBoundaryScale(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Trail Memory</label><span className="text-indigo-400 font-mono">{trailMemory}</span></div>
-                          <input type="range" min="500" max="8000" step="500" value={trailMemory} onChange={(e) => setTrailMemory(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
+                          <input type="range" min="500" max="8000" step="500" value={trailMemory} onChange={(e) => setTrailMemory(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" disabled={showHologram3D} />
                         </div>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs"><label className="text-slate-400">Speed</label><span className="text-indigo-400 font-mono">x{speed}</span></div>
@@ -273,11 +311,21 @@
                         </div>
                     </div>
                     <div className="pt-2 border-t border-slate-800 space-y-2">
-                        <label className="flex items-center justify-between p-2 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50">
-                          <span className="text-xs font-medium">Dual Geometry Mesh</span>
-                          <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" />
+                        <label className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors ${showHologram3D ? 'bg-indigo-900/50 border border-indigo-500/50' : 'bg-slate-800/30 hover:bg-slate-800/50'}`}>
+                          <div className="flex items-center gap-2">
+                              <MonitorIcon size={14} className={showHologram3D ? 'text-indigo-400' : 'text-slate-400'} />
+                              <span className={`text-xs font-medium ${showHologram3D ? 'text-indigo-300' : 'text-slate-300'}`}>3D Pyramid Projector</span>
+                          </div>
+                          <input type="checkbox" checked={showHologram3D} onChange={() => setShowHologram3D(!showHologram3D)} className="w-4 h-4 rounded accent-indigo-500" />
                         </label>
-                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs">
+                        {showHologram3D && <p className="text-[10px] text-indigo-400/80 leading-tight italic px-1">Scale boundary to ~30%. Place physical glass pyramid on the center alignment cross.</p>}
+
+                        <label className={`flex items-center justify-between p-2 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50 ${showHologram3D ? 'opacity-50 pointer-events-none' : ''}`}>
+                          <span className="text-xs font-medium text-slate-300">Dual Geometry Mesh</span>
+                          <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" disabled={showHologram3D} />
+                        </label>
+
+                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs mt-2">
                           <RefreshCw size={12} /> Reset Data
                         </button>
                     </div>
@@ -353,40 +401,30 @@
             }
 
             if (s.initialized) {
-                // Spawn composite (even) target nodes
                 if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 25) {
                     const anomalyVal = compositeTargets[Math.floor(Math.random() * compositeTargets.length)];
-                    s.zetaTargets.push({ 
-                        x: 20 + Math.random()*(cw-40), 
-                        y: 20 + Math.random()*(ch-40), 
-                        consumed: false,
-                        val: anomalyVal
-                    });
+                    s.zetaTargets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false, val: anomalyVal });
                     s.lastSpawn = Date.now();
                 }
 
                 s.bots.forEach(bot => {
                     let mathForceX = 0; let mathForceY = 0;
                     
-                    // Repulsion from own memory trails
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); mathForceX += (dx/dist) * 0.3; mathForceY += (dy/dist) * 0.3; }
                     });
 
-                    // Harmonic Resonance to composites
+                    let attractX = 0; let attractY = 0; let minDist = Infinity;
                     s.zetaTargets.forEach((target) => {
                         if (target.consumed) return; 
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        
                         if (distSq < 90000 && distSq > 0.1) { 
                             const dist = Math.sqrt(distSq); 
-                            // Stronger pull based on compression state (val)
                             const attractionStrength = (target.val / 28) * 2.0; 
                             mathForceX += (dx/dist) * attractionStrength; 
                             mathForceY += (dy/dist) * attractionStrength; 
                         }
-                        
                         if (distSq < 400) { 
                             target.consumed = true; 
                             s.zetaCount += 1; 
@@ -426,7 +464,6 @@
                 ctx.beginPath(); ctx.rect(target.x-8, target.y-8, 16, 16);
                 ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1.5; ctx.stroke();
                 ctx.fillStyle = 'rgba(74, 222, 128, 0.15)'; ctx.fill();
-                // Draw Composite Number
                 ctx.fillStyle = '#4ade80'; ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 ctx.fillText(target.val, target.x, target.y);
             });
@@ -560,7 +597,6 @@
                 s.bots = []; s.healthy = [];
                 for(let i=0; i<15; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: isSwarm ? '#34d399' : '#fb923c', size: 2 });
                 
-                // Spawn Healthy Structural Primes (3, 5, 7)
                 for(let i=0; i<25; i++) {
                     s.healthy.push({ 
                         x: 20 + Math.random()*(cw-40), 
@@ -573,7 +609,6 @@
             }
             if (!s.init) return;
 
-            // Spawn Anomalies (Cancerous Evens) hidden in corners
             if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
                 const corners = [
                     { x: cw * 0.05, y: ch * 0.1 }, { x: cw * 0.95, y: ch * 0.1 },
@@ -599,38 +634,32 @@
                 let hitWall = false;
                 
                 if (isSwarm) {
-                    // Memory Repulsion
                     s.visitedNodes.forEach(node => {
                         const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); mathForceX += (dx/dist) * 0.3; mathForceY += (dy/dist) * 0.3; }
                     });
 
-                    // MATH LOGIC: Phase Dissonance from Structural Primes
                     s.healthy.forEach(primeNode => {
                         const dx = bot.x - primeNode.x; const dy = bot.y - primeNode.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 3500 && distSq > 0.1) { 
                             const dist = Math.sqrt(distSq); 
-                            // Repulsion governed by prime value
                             const repulsionStrength = primeNode.val * 0.15; 
                             mathForceX += (dx/dist) * repulsionStrength; 
                             mathForceY += (dy/dist) * repulsionStrength; 
                         }
                     });
                     
-                    // MATH LOGIC: Harmonic Resonance to Composite Anomalies
                     s.targets.forEach((target) => {
                         if (target.consumed) return;
                         const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 60000 && distSq > 0.1) { 
                             const dist = Math.sqrt(distSq); 
-                            // Attraction governed by composite gravity/compression state
                             const attractionStrength = (target.val / 28) * 3.0; 
                             mathForceX += (dx/dist) * attractionStrength; 
                             mathForceY += (dy/dist) * attractionStrength; 
                         }
                     });
 
-                    // Hard wall prediction
                     if (bot.x < 15) bot.vx += 0.5; else if (bot.x > cw - 15) bot.vx -= 0.5;
                     if (bot.y < 15) bot.vy += 0.5; else if (bot.y > ch - 15) bot.vy -= 0.5;
                     obstacles.forEach(obs => {
@@ -640,18 +669,16 @@
                         }
                     });
                 } else {
-                    // STANDARD CHAOS: Ignores the math, violently crashes into primes
                     s.healthy.forEach(primeNode => {
                         const dx = bot.x - primeNode.x; const dy = bot.y - primeNode.y; const distSq = dx*dx + dy*dy;
                         if (distSq < 200 && primeNode.cooldown === 0) { 
-                            bot.vx *= -1.5; bot.vy *= -1.5; // Destructive bounce
+                            bot.vx *= -1.5; bot.vy *= -1.5; 
                             s.damage += 1; 
                             primeNode.cooldown = 30;
                         }
                     });
                 }
 
-                // Check Assimilation
                 s.targets.forEach((target) => {
                     if (target.consumed) return;
                     const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
@@ -669,7 +696,6 @@
                     if (speed > 2.5) { bot.vx = (bot.vx/speed)*2.5; bot.vy = (bot.vy/speed)*2.5; }
                 }
 
-                // Physical Bounds & Obstacle collisions
                 bot.x += bot.vx;
                 if (bot.x < 0) { bot.x=0; bot.vx *= -1; hitWall = true;} else if (bot.x > cw) {bot.x=cw; bot.vx *= -1; hitWall = true;}
                 obstacles.forEach(obs => {
@@ -694,10 +720,9 @@
             ctx.fillStyle = 'rgba(159, 18, 57, 0.5)'; ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)'; ctx.lineWidth = 1;
             obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
 
-            // DRAW STRUCTURAL PRIMES (MATH VISUALIZATION)
             s.healthy.forEach(h => {
                 ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, Math.PI*2);
-                ctx.fillStyle = h.cooldown > 0 ? 'rgba(239, 68, 68, 0.5)' : 'rgba(52, 211, 153, 0.2)'; // Flash red if damaged
+                ctx.fillStyle = h.cooldown > 0 ? 'rgba(239, 68, 68, 0.5)' : 'rgba(52, 211, 153, 0.2)'; 
                 ctx.fill();
                 ctx.strokeStyle = h.cooldown > 0 ? '#ef4444' : '#34d399'; ctx.lineWidth = 1; ctx.stroke();
                 ctx.fillStyle = h.cooldown > 0 ? '#ef4444' : '#34d399'; ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -715,7 +740,6 @@
                 }
             }
 
-            // DRAW COMPOSITE ANOMALIES (MATH VISUALIZATION)
             s.targets.forEach(target => { 
                 ctx.beginPath(); ctx.arc(target.x, target.y, 10, 0, Math.PI*2); 
                 ctx.fillStyle = 'rgba(254, 240, 138, 0.2)'; ctx.fill(); 
