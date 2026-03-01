@@ -3,1113 +3,1494 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Genesis: Holography & Swarm Logic</title>
-    
-    <!-- Load Tailwind CSS -->
+    <title>Project Genesis v2 — Holographic Intelligence Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Load React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- Load Babel to compile JSX in the browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</head>
-<body class="bg-slate-950 text-slate-100 font-sans overflow-hidden">
-    <div id="root"></div>
-
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-
-        // --- Inline Icons ---
-        const Activity = ({size=24}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>;
-        const Play = ({size=18}) => <svg width={size} height={size} fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
-        const Pause = ({size=18}) => <svg width={size} height={size} fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>;
-        const RefreshCw = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>;
-        const BoxIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>;
-        const NetworkIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>;
-        const HeartPulse = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"></path></svg>;
-        const CpuIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>;
-        const MonitorIcon = ({size=16}) => <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>;
-
-        // ==========================================
-        // PRIME MATH UTILS
-        // ==========================================
-        const getPrimeFactorizationString = (n) => {
-            const factors = { 6: "3 x 2", 10: "5 x 2", 12: "3 x 2 x 2", 14: "7 x 2", 20: "5 x 2 x 2", 24: "3 x 2 x 2 x 2", 28: "7 x 2 x 2" };
-            return factors[n] || "Assimilated";
-        };
-        const compositeTargets = [6, 10, 12, 14, 20, 24, 28]; // Even states to be assimilated
-        const structuralPrimes = [3, 5, 7]; // Healthy structural bases
-
-        // ==========================================
-        // TAB 1: BILLIARD INVERSION (MULTI-SIM & 3D HOLOGRAPHY)
-        // ==========================================
-        const BilliardSim = () => {
-          const [isRunning, setIsRunning] = useState(false);
-          const [inversionRadius, setInversionRadius] = useState(100);
-          const [speed, setSpeed] = useState(2);
-          const [particleCount, setParticleCount] = useState(3);
-          const [trailMemory, setTrailMemory] = useState(3000);
-          const [boundaryScale, setBoundaryScale] = useState(30); // Lower default for Pyramid mode
-          const [showInversionCircle, setShowInversionCircle] = useState(true);
-          const [showDynamicGrid, setShowDynamicGrid] = useState(true);
-          const [showHologram3D, setShowHologram3D] = useState(false);
-          
-          const [windingNumber, setWindingNumber] = useState(0);
-          const [cornerHits, setCornerHits] = useState(0);
-          const [configsRegistered, setConfigsRegistered] = useState(0);
-
-          const canvasRef = useRef(null);
-          const requestRef = useRef(null);
-          const stateRef = useRef({ 
-            particles: [], gridPhase: 0,
-            winding: 0, corners: 0, configs: 0 
-          });
-
-          useEffect(() => {
-            const saved = JSON.parse(localStorage.getItem('genesis_billiard') || '{}');
-            stateRef.current.winding = saved.winding || 0;
-            stateRef.current.corners = saved.corners || 0;
-            stateRef.current.configs = saved.configs || 0;
-            
-            const syncInterval = setInterval(() => {
-                setWindingNumber(stateRef.current.winding);
-                setCornerHits(stateRef.current.corners);
-                setConfigsRegistered(stateRef.current.configs);
-                localStorage.setItem('genesis_billiard', JSON.stringify({ winding: stateRef.current.winding, corners: stateRef.current.corners, configs: stateRef.current.configs }));
-            }, 500);
-            return () => clearInterval(syncInterval);
-          }, []);
-
-          useEffect(() => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-            const handleResize = () => {
-              if (canvas.parentElement) { 
-                canvas.width = canvas.parentElement.clientWidth; 
-                canvas.height = canvas.parentElement.clientHeight; 
-                stateRef.current.particles = [];
-              }
-            };
-            window.addEventListener('resize', handleResize);
-            setTimeout(handleResize, 100); 
-            return () => window.removeEventListener('resize', handleResize);
-          }, []);
-
-          const invertPoint = (x, y, cx, cy, r) => {
-            const dx = x - cx; const dy = y - cy; const distSq = dx * dx + dy * dy;
-            if (distSq === 0) return { x, y };
-            const factor = (r * r) / distSq;
-            return { x: cx + dx * factor, y: cy + dy * factor };
-          };
-
-          const update = () => {
-            const s = stateRef.current; const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            const cw = canvas.width; const ch = canvas.height;
-            const cx = cw / 2; const cy = ch / 2; 
-            
-            const boundSize = Math.min(cw, ch) * (boundaryScale / 100); 
-            const halfSize = boundSize / 2;
-
-            if (s.particles.length !== particleCount) {
-                const currentCount = s.particles.length;
-                if (currentCount < particleCount) {
-                    const vels = [{x: 1.8, y: 1.3}, {x: -1.5, y: 1.7}, {x: 1.6, y: -1.4}];
-                    const colors = [
-                        { std: '#38bdf8', inv: ['rgba(56, 189, 248, 0.8)', 'rgba(56, 189, 248, 0.1)'] }, // Cyan
-                        { std: '#f472b6', inv: ['rgba(236, 72, 153, 0.8)', 'rgba(236, 72, 153, 0.1)'] }, // Pink
-                        { std: '#fbbf24', inv: ['rgba(251, 191, 36, 0.8)', 'rgba(251, 191, 36, 0.1)'] }  // Amber
-                    ];
-                    for(let i=currentCount; i<particleCount; i++) {
-                        s.particles.push({
-                            pos: { x: cx, y: cy },
-                            vel: vels[i % 3],
-                            color: colors[i % 3],
-                            stdPath: [], invPath: []
-                        });
-                    }
-                } else {
-                    s.particles = s.particles.slice(0, particleCount);
-                }
-            }
-
-            s.particles.forEach(p => {
-                for (let i = 0; i < speed; i++) {
-                  p.pos.x += p.vel.x; p.pos.y += p.vel.y;
-                  
-                  const left = cx - halfSize; const right = cx + halfSize; 
-                  const top = cy - halfSize; const bottom = cy + halfSize;
-                  let hitCornerX = false; let hitCornerY = false;
-
-                  if (p.pos.x <= left) { p.vel.x *= -1; p.pos.x = left + 1; hitCornerX = Math.abs(p.pos.y - top) < 15 || Math.abs(p.pos.y - bottom) < 15; }
-                  else if (p.pos.x >= right) { p.vel.x *= -1; p.pos.x = right - 1; hitCornerX = Math.abs(p.pos.y - top) < 15 || Math.abs(p.pos.y - bottom) < 15; }
-                  
-                  if (p.pos.y <= top) { p.vel.y *= -1; p.pos.y = top + 1; hitCornerY = Math.abs(p.pos.x - left) < 15 || Math.abs(p.pos.x - right) < 15; }
-                  else if (p.pos.y >= bottom) { p.vel.y *= -1; p.pos.y = bottom - 1; hitCornerY = Math.abs(p.pos.x - left) < 15 || Math.abs(p.pos.x - right) < 15; }
-
-                  if (hitCornerX || hitCornerY) {
-                    s.corners += 1;
-                    s.winding += (p.vel.x * p.vel.y > 0 ? 1 : -1);
-                  }
-
-                  p.stdPath.push({x: p.pos.x, y: p.pos.y});
-                  if (p.stdPath.length > trailMemory) p.stdPath.shift();
-
-                  const inverted = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
-                  p.invPath.push(inverted);
-                  if (p.invPath.length > trailMemory) p.invPath.shift();
-                }
-            });
-
-            s.gridPhase += 0.05 * speed;
-            s.configs += Math.floor(speed * 4 * particleCount); 
-
-            ctx.clearRect(0, 0, cw, ch);
-
-            // Background Grid
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-            ctx.lineWidth = 1; ctx.beginPath();
-            for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
-            for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
-            ctx.stroke();
-
-            // 3D Pepper's Ghost Base Alignment Marks
-            if (showHologram3D) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.setLineDash([5, 5]);
-                ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
-                ctx.beginPath();
-                ctx.moveTo(cx - halfSize, cy - halfSize); ctx.lineTo(cx + halfSize, cy + halfSize);
-                ctx.moveTo(cx + halfSize, cy - halfSize); ctx.lineTo(cx - halfSize, cy + halfSize);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Draw Projection Zone Guides
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-                ctx.strokeRect(cx - halfSize, cy + halfSize, boundSize, boundSize); // Bottom
-                ctx.strokeRect(cx - halfSize, cy - halfSize - boundSize, boundSize, boundSize); // Top
-                ctx.strokeRect(cx + halfSize, cy - halfSize, boundSize, boundSize); // Right
-                ctx.strokeRect(cx - halfSize - boundSize, cy - halfSize, boundSize, boundSize); // Left
-            }
-
-            if (showDynamicGrid && !showHologram3D) {
-              ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; 
-              ctx.lineWidth = 1; ctx.beginPath();
-              const phaseOffset = Math.sin(s.gridPhase) * 20;
-              for(let i = -halfSize; i <= halfSize; i+=30) {
-                  let x = cx + i + phaseOffset;
-                  if (x > cx - halfSize && x < cx + halfSize) { ctx.moveTo(x, cy - halfSize); ctx.lineTo(x, cy + halfSize); }
-                  let y = cy + i + Math.cos(s.gridPhase) * 20;
-                  if (y > cy - halfSize && y < cy + halfSize) { ctx.moveTo(cx - halfSize, y); ctx.lineTo(cx + halfSize, y); }
-              }
-              ctx.stroke();
-            }
-
-            if (showInversionCircle && !showHologram3D) {
-              ctx.beginPath(); ctx.arc(cx, cy, inversionRadius, 0, Math.PI * 2);
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
-            }
-
-            if (!showHologram3D) {
-              ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
-              ctx.strokeRect(cx - halfSize, cy - halfSize, boundSize, boundSize);
-            }
-
-            s.particles.forEach(p => {
-                if (!showHologram3D) {
-                    // Standard Trails
-                    if (p.stdPath.length > 1) {
-                      ctx.beginPath(); ctx.moveTo(p.stdPath[0].x, p.stdPath[0].y);
-                      for (let i = 1; i < p.stdPath.length; i++) ctx.lineTo(p.stdPath[i].x, p.stdPath[i].y);
-                      ctx.strokeStyle = p.color.std + '60'; ctx.lineWidth = 1; ctx.stroke();
-                    }
-
-                    // Inverted Holographic Overlap Trails
-                    if (p.invPath.length > 1) {
-                      ctx.beginPath(); ctx.moveTo(p.invPath[0].x, p.invPath[0].y);
-                      for (let i = 1; i < p.invPath.length; i++) ctx.lineTo(p.invPath[i].x, p.invPath[i].y);
-                      const gradient = ctx.createRadialGradient(cx, cy, 10, cx, cy, inversionRadius * 2);
-                      gradient.addColorStop(0, p.color.inv[0]); gradient.addColorStop(1, p.color.inv[1]);
-                      ctx.strokeStyle = gradient; ctx.lineWidth = 1.5; ctx.stroke();
-                    }
-
-                    // Base Particle
-                    ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, 3, 0, Math.PI * 2);
-                    ctx.fillStyle = p.color.std; ctx.fill(); 
-
-                    // Inverted Particle
-                    const currentInv = invertPoint(p.pos.x, p.pos.y, cx, cy, inversionRadius);
-                    ctx.beginPath(); ctx.arc(currentInv.x, currentInv.y, 4, 0, Math.PI * 2);
-                    ctx.fillStyle = p.color.inv[0].replace('0.8', '1.0'); ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle; ctx.fill(); ctx.shadowBlur = 0;
-                } else {
-                    // 3D HOLOGRAM PROJECTION LOGIC (PEPPER'S GHOST)
-                    const dx = p.pos.x - cx;
-                    const dy = p.pos.y - cy;
-                    
-                    const drawProjectedOrb = (px, py, colorStr) => {
-                        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2);
-                        ctx.fillStyle = colorStr;
-                        ctx.shadowBlur = 15; ctx.shadowColor = colorStr; ctx.fill(); ctx.shadowBlur = 0;
-                        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px-1, py-1, 2, 0, Math.PI*2); ctx.fill(); 
-                    };
-
-                    // 4-Way Rotational Projection Matrix mapping center square to outer bounds
-                    drawProjectedOrb(cx + dx, cy + boundSize + dy, p.color.std); // Bottom Projection
-                    drawProjectedOrb(cx - dx, cy - boundSize - dy, p.color.std); // Top Projection
-                    drawProjectedOrb(cx + boundSize + dy, cy + dx, p.color.std); // Right Projection
-                    drawProjectedOrb(cx - boundSize - dy, cy - dx, p.color.std); // Left Projection
-                }
-            });
-
-            requestRef.current = requestAnimationFrame(update);
-          };
-
-          useEffect(() => {
-            if (isRunning) requestRef.current = requestAnimationFrame(update);
-            else if (requestRef.current) cancelAnimationFrame(requestRef.current);
-            return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning, speed, inversionRadius, particleCount, boundaryScale, trailMemory, showDynamicGrid, showHologram3D]);
-
-          const handleReset = () => {
-             stateRef.current.particles.forEach(p => { p.stdPath = []; p.invPath = []; p.pos = {x: canvasRef.current.width/2, y: canvasRef.current.height/2}; }); 
-             stateRef.current.winding = 0; stateRef.current.corners = 0; stateRef.current.configs = 0;
-             setWindingNumber(0); setCornerHits(0); setConfigsRegistered(0);
-             localStorage.setItem('genesis_billiard', JSON.stringify({ winding: 0, corners: 0, configs: 0 }));
-          };
-
-          return (
-            <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none">
-                  <section className="space-y-4">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">Controls</h2>
-                        <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-indigo-500'}`}>{isRunning ? 'Pause' : 'Start'}</button>
-                    </div>
-                    <div className="space-y-4">
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><label className="text-slate-400">Active Simulators</label><span className="text-indigo-400 font-mono">{particleCount}</span></div>
-                          <input type="range" min="1" max="3" value={particleCount} onChange={(e) => setParticleCount(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><label className="text-slate-400">Inversion Radius</label><span className="text-indigo-400 font-mono">{inversionRadius}px</span></div>
-                          <input type="range" min="30" max="250" value={inversionRadius} onChange={(e) => setInversionRadius(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" disabled={showHologram3D} />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><label className="text-slate-400">Boundary Scale</label><span className="text-indigo-400 font-mono">{boundaryScale}%</span></div>
-                          <input type="range" min="20" max="90" value={boundaryScale} onChange={(e) => setBoundaryScale(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><label className="text-slate-400">Trail Memory</label><span className="text-indigo-400 font-mono">{trailMemory}</span></div>
-                          <input type="range" min="500" max="8000" step="500" value={trailMemory} onChange={(e) => setTrailMemory(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" disabled={showHologram3D} />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex justify-between text-xs"><label className="text-slate-400">Speed</label><span className="text-indigo-400 font-mono">x{speed}</span></div>
-                          <input type="range" min="1" max="10" value={speed} onChange={(e) => setSpeed(parseInt(e.target.value))} className="w-full accent-indigo-500 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer" />
-                        </div>
-                    </div>
-                    <div className="pt-2 border-t border-slate-800 space-y-2">
-                        <label className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-colors ${showHologram3D ? 'bg-indigo-900/50 border border-indigo-500/50' : 'bg-slate-800/30 hover:bg-slate-800/50'}`}>
-                          <div className="flex items-center gap-2">
-                              <MonitorIcon size={14} className={showHologram3D ? 'text-indigo-400' : 'text-slate-400'} />
-                              <span className={`text-xs font-medium ${showHologram3D ? 'text-indigo-300' : 'text-slate-300'}`}>3D Pyramid Projector</span>
-                          </div>
-                          <input type="checkbox" checked={showHologram3D} onChange={() => setShowHologram3D(!showHologram3D)} className="w-4 h-4 rounded accent-indigo-500" />
-                        </label>
-                        {showHologram3D && <p className="text-[10px] text-indigo-400/80 leading-tight italic px-1">Scale boundary to ~30%. Place physical glass pyramid on the center alignment cross.</p>}
-
-                        <label className={`flex items-center justify-between p-2 bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-800/50 ${showHologram3D ? 'opacity-50 pointer-events-none' : ''}`}>
-                          <span className="text-xs font-medium text-slate-300">Dual Geometry Mesh</span>
-                          <input type="checkbox" checked={showDynamicGrid} onChange={() => setShowDynamicGrid(!showDynamicGrid)} className="w-4 h-4 rounded accent-indigo-500" disabled={showHologram3D} />
-                        </label>
-
-                        <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-semibold text-xs mt-2">
-                          <RefreshCw size={12} /> Reset Data
-                        </button>
-                    </div>
-                  </section>
-                </aside>
-                <div className="flex-1 relative min-h-0 bg-[radial-gradient(circle_at_center,_#111827_0%,_#020617_100%)] overflow-hidden">
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none">
-                    <div className="bg-slate-900/90 backdrop-blur-md border border-slate-700 p-3 rounded-xl min-w-[200px] shadow-2xl">
-                      <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Free Configs</span><span className="text-sky-400 font-mono">{configsRegistered.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Agg. Winding</span><span className="text-emerald-400 font-mono">{windingNumber}</span></div>
-                      <div className="flex justify-between text-xs"><span className="text-slate-500">Agg. Corners</span><span className="text-amber-400 font-mono">{cornerHits}</span></div>
-                    </div>
-                  </div>
-                </div>
-            </div>
-          );
-        };
-
-        // ==========================================
-        // TAB 2: ZETA SWARM (PRIME MATH LOGIC)
-        // ==========================================
-        const ZetaSwarmSim = () => {
-          const canvasRef = useRef(null);
-          const requestRef = useRef(null);
-          const [zetaSorted, setZetaSorted] = useState(0);
-          const [isRunning, setIsRunning] = useState(true);
-          const [dataLog, setDataLog] = useState([]);
-          
-          const simState = useRef({ 
-            bots: [], visitedNodes: [], zetaTargets: [], 
-            lastSpawn: 0, zetaCount: 0, initialized: false,
-            newLogs: [] 
-          });
-
-          useEffect(() => {
-            const saved = JSON.parse(localStorage.getItem('genesis_zeta') || '{}');
-            simState.current.zetaCount = saved.count || 0;
-            const syncInterval = setInterval(() => {
-                setZetaSorted(simState.current.zetaCount);
-                localStorage.setItem('genesis_zeta', JSON.stringify({ count: simState.current.zetaCount }));
-                
-                if (simState.current.newLogs.length > 0) {
-                    setDataLog(prev => {
-                        const updated = [...simState.current.newLogs, ...prev];
-                        return updated.slice(0, 6); 
-                    });
-                    simState.current.newLogs = [];
-                }
-            }, 500);
-            return () => clearInterval(syncInterval);
-          }, []);
-
-          useEffect(() => {
-            const handleResize = () => { if (canvasRef.current && canvasRef.current.parentElement) { canvasRef.current.width = canvasRef.current.parentElement.clientWidth; canvasRef.current.height = canvasRef.current.parentElement.clientHeight; } };
-            window.addEventListener('resize', handleResize);
-            setTimeout(handleResize, 100);
-            return () => window.removeEventListener('resize', handleResize);
-          }, []);
-
-          const update = () => {
-            const s = simState.current; const canvas = canvasRef.current;
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
-
-            if (!s.initialized && cw > 0 && ch > 0) {
-                s.bots = [];
-                for(let i=0; i<7; i++) { 
-                    const angle = (i/7) * Math.PI * 2;
-                    s.bots.push({ group: 3, x: cw/2, y: ch/2, vx: Math.cos(angle)*3, vy: Math.sin(angle)*3, color: '#22d3ee', size: 4 }); 
-                }
-                s.initialized = true;
-            }
-
-            if (s.initialized) {
-                if (Date.now() - s.lastSpawn > 800 && s.zetaTargets.length < 25) {
-                    const anomalyVal = compositeTargets[Math.floor(Math.random() * compositeTargets.length)];
-                    s.zetaTargets.push({ x: 20 + Math.random()*(cw-40), y: 20 + Math.random()*(ch-40), consumed: false, val: anomalyVal });
-                    s.lastSpawn = Date.now();
-                }
-
-                s.bots.forEach(bot => {
-                    let mathForceX = 0; let mathForceY = 0;
-                    
-                    s.visitedNodes.forEach(node => {
-                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); mathForceX += (dx/dist) * 0.3; mathForceY += (dy/dist) * 0.3; }
-                    });
-
-                    let attractX = 0; let attractY = 0; let minDist = Infinity;
-                    s.zetaTargets.forEach((target) => {
-                        if (target.consumed) return; 
-                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 90000 && distSq > 0.1) { 
-                            const dist = Math.sqrt(distSq); 
-                            const attractionStrength = (target.val / 28) * 2.0; 
-                            mathForceX += (dx/dist) * attractionStrength; 
-                            mathForceY += (dy/dist) * attractionStrength; 
-                        }
-                        if (distSq < 400) { 
-                            target.consumed = true; 
-                            s.zetaCount += 1; 
-                            const factorization = getPrimeFactorizationString(target.val);
-                            s.newLogs.push({ id: Math.random().toString(), text: `Anomaly [${target.val}] assimilated -> ${factorization}` });
-                        } 
-                    });
-
-                    if (bot.x < 20) bot.vx += 0.5; if (bot.x > cw - 20) bot.vx -= 0.5;
-                    if (bot.y < 20) bot.vy += 0.5; if (bot.y > ch - 20) bot.vy -= 0.5;
-
-                    bot.vx += mathForceX + (Math.random()-0.5)*0.5; 
-                    bot.vy += mathForceY + (Math.random()-0.5)*0.5;
-                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 4.5) { bot.vx = (bot.vx/speed)*4.5; bot.vy = (bot.vy/speed)*4.5; }
-
-                    bot.x += bot.vx; bot.y += bot.vy;
-                    if (bot.x < 0) { bot.x = 0; bot.vx *= -1; } if (bot.x > cw) { bot.x = cw; bot.vx *= -1; }
-                    if (bot.y < 0) { bot.y = 0; bot.vy *= -1; } if (bot.y > ch) { bot.y = ch; bot.vy *= -1; }
-
-                    if (Math.random() < 0.15) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 150}); if (s.visitedNodes.length > 200) s.visitedNodes.shift(); }
-                });
-
-                s.zetaTargets = s.zetaTargets.filter(t => !t.consumed);
-                s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
-            }
-
-            ctx.fillStyle = 'rgba(15, 23, 42, 0.4)'; ctx.fillRect(0, 0, cw, ch);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)'; ctx.lineWidth = 1; ctx.beginPath();
-            for(let x=0; x<cw; x+=50) { ctx.moveTo(x,0); ctx.lineTo(x,ch); }
-            for(let y=0; y<ch; y+=50) { ctx.moveTo(0,y); ctx.lineTo(cw,y); }
-            ctx.stroke();
-
-            s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 2, 0, Math.PI*2); ctx.fillStyle = `rgba(255, 255, 255, ${node.age/1000})`; ctx.fill(); });
-            
-            s.zetaTargets.forEach(target => {
-                ctx.beginPath(); ctx.rect(target.x-8, target.y-8, 16, 16);
-                ctx.strokeStyle = '#4ade80'; ctx.lineWidth = 1.5; ctx.stroke();
-                ctx.fillStyle = 'rgba(74, 222, 128, 0.15)'; ctx.fill();
-                ctx.fillStyle = '#4ade80'; ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(target.val, target.x, target.y);
-            });
-
-            ctx.lineWidth = 0.5;
-            for(let i=0; i<s.bots.length; i++) {
-                for(let j=i+1; j<s.bots.length; j++) {
-                    const b1 = s.bots[i]; const b2 = s.bots[j];
-                    const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                    if (dx*dx + dy*dy < 20000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = '#22d3ee50'; ctx.stroke(); }
-                }
-            }
-
-            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.shadowBlur = 10; ctx.shadowColor = bot.color; ctx.fill(); ctx.shadowBlur = 0; });
-            if (isRunning) requestRef.current = requestAnimationFrame(update);
-          };
-
-          useEffect(() => {
-            if (isRunning) requestRef.current = requestAnimationFrame(update);
-            else if (requestRef.current) cancelAnimationFrame(requestRef.current);
-            return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-          }, [isRunning]);
-
-          const handleReset = () => {
-             simState.current.zetaCount = 0;
-             simState.current.newLogs = [];
-             setZetaSorted(0);
-             setDataLog([]);
-             localStorage.setItem('genesis_zeta', JSON.stringify({ count: 0 }));
-          };
-
-          return (
-             <div className="flex-1 flex flex-col md:flex-row relative min-h-0 overflow-hidden">
-                <aside className="w-full md:w-72 flex-shrink-0 bg-slate-900/30 border-b md:border-b-0 md:border-r border-slate-800 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[45%] md:max-h-none flex flex-col">
-                  <section className="space-y-4 flex-1">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-400">Protocol</h2>
-                        <button onClick={() => setIsRunning(!isRunning)} className={`px-4 py-1.5 rounded-full text-xs font-bold ${isRunning ? 'bg-rose-500' : 'bg-emerald-500'}`}>{isRunning ? 'Halt' : 'Resume'}</button>
-                    </div>
-
-                    <div className="p-4 bg-slate-800/80 rounded-xl border border-slate-600 shadow-lg">
-                        <div className="text-xs text-slate-400 uppercase font-bold mb-1">Evens Assimilated</div>
-                        <div className="text-3xl font-mono text-emerald-400">{zetaSorted.toLocaleString()}</div>
-                    </div>
-
-                    <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl shadow-inner flex-1 flex flex-col min-h-[120px]">
-                        <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Live Math Terminal</div>
-                        <div className="font-mono text-[10px] text-sky-400/80 space-y-1 overflow-hidden flex flex-col justify-end flex-1">
-                            {dataLog.map((log, i) => (
-                                <div key={log.id} className={`truncate ${i === 0 ? 'text-sky-300 font-bold' : ''}`}>
-                                    > {log.text}
-                                </div>
-                            ))}
-                            {dataLog.length === 0 && <div className="text-slate-600 italic">Awaiting compression target...</div>}
-                        </div>
-                    </div>
-                  </section>
-                  <div className="pt-4 mt-auto">
-                      <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-400 font-semibold text-xs transition-colors">
-                          <RefreshCw size={12} /> Reset Ledger
-                      </button>
-                  </div>
-                </aside>
-                <div className="flex-1 relative min-h-0 bg-slate-950 overflow-hidden">
-                  <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
-                </div>
-             </div>
-          );
-        };
-
-        // ==========================================
-        // TAB 3: MEDICAL APPLICATION (PRIME MATH PROOF)
-        // ==========================================
-        const MedicalSim = () => {
-          const canvasStandardRef = useRef(null);
-          const canvasSwarmRef = useRef(null);
-          const requestRef = useRef(null);
-          
-          const [stats, setStats] = useState({ standard: {hits: 0, cols: 0, damage: 0}, swarm: {hits: 0, cols: 0, damage: 0} });
-          const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], healthy: [], lastSpawn: 0, hits: 0, cols: 0, damage: 0, init: false },
-            swarm: { bots: [], visitedNodes: [], targets: [], healthy: [], lastSpawn: 0, hits: 0, cols: 0, damage: 0, init: false }
-          });
-
-          useEffect(() => {
-            const saved = JSON.parse(localStorage.getItem('genesis_medical') || '{}');
-            simState.current.standard.hits = saved.standardHits || 0;
-            simState.current.standard.cols = saved.standardCols || 0;
-            simState.current.standard.damage = saved.standardDamage || 0;
-            simState.current.swarm.hits = saved.swarmHits || 0;
-            simState.current.swarm.cols = saved.swarmCols || 0;
-            simState.current.swarm.damage = saved.swarmDamage || 0;
-            
-            const syncInterval = setInterval(() => {
-                setStats({ 
-                    standard: {hits: simState.current.standard.hits, cols: simState.current.standard.cols, damage: simState.current.standard.damage}, 
-                    swarm: {hits: simState.current.swarm.hits, cols: simState.current.swarm.cols, damage: simState.current.swarm.damage} 
-                });
-                localStorage.setItem('genesis_medical', JSON.stringify({ 
-                    standardHits: simState.current.standard.hits, standardCols: simState.current.standard.cols, standardDamage: simState.current.standard.damage,
-                    swarmHits: simState.current.swarm.hits, swarmCols: simState.current.swarm.cols, swarmDamage: simState.current.swarm.damage 
-                }));
-            }, 300);
-            return () => clearInterval(syncInterval);
-          }, []);
-
-          useEffect(() => {
-            const handleResize = () => {
-              [canvasStandardRef.current, canvasSwarmRef.current].forEach(canvas => {
-                if (canvas && canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
-              });
-            };
-            window.addEventListener('resize', handleResize);
-            setTimeout(handleResize, 100);
-            return () => window.removeEventListener('resize', handleResize);
-          }, []);
-
-          const updateEngine = (s, canvas, isSwarm) => {
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
-
-            const obstacles = [
-                { x: cw * 0.2, y: 0, w: cw * 0.05, h: ch * 0.4 }, 
-                { x: cw * 0.2, y: ch * 0.6, w: cw * 0.05, h: ch * 0.4 },
-                { x: cw * 0.5, y: ch * 0.2, w: cw * 0.05, h: ch * 0.6 },
-                { x: cw * 0.8, y: 0, w: cw * 0.05, h: ch * 0.3 },
-                { x: cw * 0.8, y: ch * 0.7, w: cw * 0.05, h: ch * 0.3 }
-            ];
-
-            if (!s.init && cw > 0 && ch > 0) {
-                s.bots = []; s.healthy = [];
-                for(let i=0; i<15; i++) s.bots.push({ x: cw/2, y: ch/2, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, color: isSwarm ? '#34d399' : '#fb923c', size: 2 });
-                
-                for(let i=0; i<25; i++) {
-                    s.healthy.push({ 
-                        x: 20 + Math.random()*(cw-40), 
-                        y: 20 + Math.random()*(ch-40), 
-                        val: structuralPrimes[Math.floor(Math.random()*3)], 
-                        cooldown: 0 
-                    });
-                }
-                s.init = true;
-            }
-            if (!s.init) return;
-
-            if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                const corners = [
-                    { x: cw * 0.05, y: ch * 0.1 }, { x: cw * 0.95, y: ch * 0.1 },
-                    { x: cw * 0.05, y: ch * 0.9 }, { x: cw * 0.95, y: ch * 0.9 },
-                    { x: cw * 0.35, y: ch * 0.5 }, { x: cw * 0.65, y: ch * 0.5 }
-                ];
-                const corner = corners[Math.floor(Math.random() * corners.length)];
-                const anomalyVal = compositeTargets[Math.floor(Math.random() * compositeTargets.length)];
-                
-                s.targets.push({ 
-                    x: corner.x + (Math.random()-0.5)*cw*0.05, 
-                    y: corner.y + (Math.random()-0.5)*ch*0.05, 
-                    consumed: false,
-                    val: anomalyVal
-                });
-                s.lastSpawn = Date.now();
-            }
-
-            s.healthy.forEach(h => { if(h.cooldown > 0) h.cooldown--; });
-
-            s.bots.forEach(bot => {
-                let mathForceX = 0; let mathForceY = 0;
-                let hitWall = false;
-                
-                if (isSwarm) {
-                    s.visitedNodes.forEach(node => {
-                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 2500 && distSq > 0.1) { const dist = Math.sqrt(distSq); mathForceX += (dx/dist) * 0.3; mathForceY += (dy/dist) * 0.3; }
-                    });
-
-                    s.healthy.forEach(primeNode => {
-                        const dx = bot.x - primeNode.x; const dy = bot.y - primeNode.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 3500 && distSq > 0.1) { 
-                            const dist = Math.sqrt(distSq); 
-                            const repulsionStrength = primeNode.val * 0.15; 
-                            mathForceX += (dx/dist) * repulsionStrength; 
-                            mathForceY += (dy/dist) * repulsionStrength; 
-                        }
-                    });
-                    
-                    s.targets.forEach((target) => {
-                        if (target.consumed) return;
-                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 60000 && distSq > 0.1) { 
-                            const dist = Math.sqrt(distSq); 
-                            const attractionStrength = (target.val / 28) * 3.0; 
-                            mathForceX += (dx/dist) * attractionStrength; 
-                            mathForceY += (dy/dist) * attractionStrength; 
-                        }
-                    });
-
-                    if (bot.x < 15) bot.vx += 0.5; else if (bot.x > cw - 15) bot.vx -= 0.5;
-                    if (bot.y < 15) bot.vy += 0.5; else if (bot.y > ch - 15) bot.vy -= 0.5;
-                    obstacles.forEach(obs => {
-                        if (bot.x > obs.x - 15 && bot.x < obs.x + obs.w + 15 && bot.y > obs.y - 15 && bot.y < obs.y + obs.h + 15) {
-                            if (bot.x < obs.x) bot.vx -= 0.6; else if (bot.x > obs.x + obs.w) bot.vx += 0.6;
-                            if (bot.y < obs.y) bot.vy -= 0.6; else if (bot.y > obs.y + obs.h) bot.vy += 0.6;
-                        }
-                    });
-                } else {
-                    s.healthy.forEach(primeNode => {
-                        const dx = bot.x - primeNode.x; const dy = bot.y - primeNode.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 200 && primeNode.cooldown === 0) { 
-                            bot.vx *= -1.5; bot.vy *= -1.5; 
-                            s.damage += 1; 
-                            primeNode.cooldown = 30;
-                        }
-                    });
-                }
-
-                s.targets.forEach((target) => {
-                    if (target.consumed) return;
-                    const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                    if (distSq < (isSwarm ? 225 : 64)) { target.consumed = true; s.hits += 1; }
-                });
-
-                if (isSwarm) {
-                    bot.vx += mathForceX + (Math.random()-0.5)*0.3;
-                    bot.vy += mathForceY + (Math.random()-0.5)*0.3;
-                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 4.5) { bot.vx = (bot.vx/speed)*4.5; bot.vy = (bot.vy/speed)*4.5; }
-                } else {
-                    bot.vx += (Math.random()-0.5) * 1.5; bot.vy += (Math.random()-0.5) * 1.5;
-                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 2.5) { bot.vx = (bot.vx/speed)*2.5; bot.vy = (bot.vy/speed)*2.5; }
-                }
-
-                bot.x += bot.vx;
-                if (bot.x < 0) { bot.x=0; bot.vx *= -1; hitWall = true;} else if (bot.x > cw) {bot.x=cw; bot.vx *= -1; hitWall = true;}
-                obstacles.forEach(obs => {
-                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) { bot.x -= bot.vx; bot.vx *= -1; hitWall = true; }
-                });
-
-                bot.y += bot.vy;
-                if (bot.y < 0) { bot.y=0; bot.vy *= -1; hitWall = true;} else if (bot.y > ch) {bot.y=ch; bot.vy *= -1; hitWall = true;}
-                obstacles.forEach(obs => {
-                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) { bot.y -= bot.vy; bot.vy *= -1; hitWall = true; }
-                });
-
-                if (hitWall) s.cols++;
-
-                if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 100}); if (s.visitedNodes.length > 150) s.visitedNodes.shift(); }
-            });
-
-            s.targets = s.targets.filter(t => !t.consumed);
-            s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
-
-            ctx.fillStyle = isSwarm ? 'rgba(76, 5, 25, 0.4)' : 'rgba(67, 10, 10, 0.4)'; ctx.fillRect(0, 0, cw, ch);
-            ctx.fillStyle = 'rgba(159, 18, 57, 0.5)'; ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)'; ctx.lineWidth = 1;
-            obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
-
-            s.healthy.forEach(h => {
-                ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, Math.PI*2);
-                ctx.fillStyle = h.cooldown > 0 ? 'rgba(239, 68, 68, 0.5)' : 'rgba(52, 211, 153, 0.2)'; 
-                ctx.fill();
-                ctx.strokeStyle = h.cooldown > 0 ? '#ef4444' : '#34d399'; ctx.lineWidth = 1; ctx.stroke();
-                ctx.fillStyle = h.cooldown > 0 ? '#ef4444' : '#34d399'; ctx.font = '8px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(h.val, h.x, h.y);
-            });
-
-            if (isSwarm) {
-                s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.arc(node.x, node.y, 3, 0, Math.PI*2); ctx.fillStyle = `rgba(244, 114, 182, ${node.age/1000})`; ctx.fill(); });
-                ctx.lineWidth = 0.5;
-                for(let i=0; i<s.bots.length; i++) {
-                    for(let j=i+1; j<s.bots.length; j++) {
-                        const b1 = s.bots[i]; const b2 = s.bots[j]; const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                        if (dx*dx + dy*dy < 10000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = 'rgba(248, 113, 113, 0.3)'; ctx.stroke(); }
-                    }
-                }
-            }
-
-            s.targets.forEach(target => { 
-                ctx.beginPath(); ctx.arc(target.x, target.y, 10, 0, Math.PI*2); 
-                ctx.fillStyle = 'rgba(254, 240, 138, 0.2)'; ctx.fill(); 
-                ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 1; ctx.stroke();
-                ctx.fillStyle = '#fef08a'; ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(target.val, target.x, target.y);
-            });
-            s.bots.forEach(bot => { ctx.beginPath(); ctx.arc(bot.x, bot.y, bot.size, 0, Math.PI*2); ctx.fillStyle = bot.color; ctx.fill(); });
-          };
-
-          const update = () => {
-             updateEngine(simState.current.standard, canvasStandardRef.current, false);
-             updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
-             requestRef.current = requestAnimationFrame(update);
-          };
-
-          useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
-
-          const handleReset = () => {
-             simState.current.standard.hits = 0; simState.current.standard.cols = 0; simState.current.standard.damage = 0;
-             simState.current.swarm.hits = 0; simState.current.swarm.cols = 0; simState.current.swarm.damage = 0;
-             simState.current.standard.targets = []; simState.current.swarm.targets = [];
-             setStats({ standard: {hits: 0, cols: 0, damage: 0}, swarm: {hits: 0, cols: 0, damage: 0} });
-             localStorage.setItem('genesis_medical', JSON.stringify({ standardHits: 0, standardCols: 0, standardDamage: 0, swarmHits: 0, swarmCols: 0, swarmDamage: 0 }));
-          };
-
-          return (
-             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-rose-950/40 border-b xl:border-b-0 xl:border-r border-rose-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[40%] xl:max-h-none flex flex-col">
-                  <section className="space-y-3 flex-1">
-                    <div className="flex items-center gap-2">
-                        <HeartPulse size={18} className="text-rose-400" />
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-rose-400">Medical Setup</h2>
-                    </div>
-                    <div className="p-2 bg-rose-900/20 rounded-xl border border-rose-500/30 hidden md:block">
-                        <p className="text-[9px] text-slate-400 leading-relaxed font-bold mb-1">Math Physics Engine Active:</p>
-                        <p className="text-[9px] text-slate-400 leading-relaxed">
-                            Structural Primes (3,5,7) cause phase dissonance (repulsion). Evens/Composites (6,12,28) cause harmonic resonance (attraction).
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
-                        <div className="p-2 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
-                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-1 border-b border-orange-700/50 pb-1">M1: Random Chaos</div>
-                            <div className="grid grid-cols-3 gap-1">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Assimilated</div><div className="text-sm font-mono text-white leading-none">{stats.standard.hits}</div></div>
-                                <div><div className="text-[8px] text-orange-400 uppercase">Wasted</div><div className="text-sm font-mono text-orange-400 leading-none">{stats.standard.cols}</div></div>
-                                <div><div className="text-[8px] text-red-400 uppercase font-bold">Cell Dmg</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.damage}</div></div>
-                            </div>
-                        </div>
-                        <div className="p-2 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
-                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
-                            <div className="grid grid-cols-3 gap-1">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Assimilated</div><div className="text-sm font-mono text-white leading-none">{stats.swarm.hits}</div></div>
-                                <div><div className="text-[8px] text-emerald-400 uppercase">Wasted</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
-                                <div><div className="text-[8px] text-emerald-200 uppercase font-bold">Cell Dmg</div><div className="text-sm font-mono text-emerald-200 leading-none">{stats.swarm.damage}</div></div>
-                            </div>
-                        </div>
-                    </div>
-                  </section>
-                  <div className="pt-2 mt-auto">
-                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-rose-800 hover:bg-rose-800/50 text-rose-300 font-semibold text-xs transition-colors">
-                        <RefreshCw size={12} /> Reset A/B Stats
-                    </button>
-                  </div>
-                </aside>
-                
-                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
-                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-rose-900/50 overflow-hidden">
-                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none z-10">
-                            <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Pure Chaos</span>
-                        </div>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#1a050f]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none z-10">
-                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Resonance Physics</span>
-                        </div>
-                    </div>
-                </div>
-             </div>
-          );
-        };
-
-        // ==========================================
-        // TAB 4: TECH/DEEP LEARNING (TRAP MAZE)
-        // ==========================================
-        const TechSim = () => {
-          const canvasStandardRef = useRef(null);
-          const canvasSwarmRef = useRef(null);
-          const requestRef = useRef(null);
-          
-          const [stats, setStats] = useState({ standard: {hits: 0, cols: 0}, swarm: {hits: 0, cols: 0} });
-          const simState = useRef({ 
-            standard: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, cols: 0, init: false },
-            swarm: { bots: [], visitedNodes: [], targets: [], lastSpawn: 0, hits: 0, cols: 0, init: false }
-          });
-
-          useEffect(() => {
-            const saved = JSON.parse(localStorage.getItem('genesis_tech') || '{}');
-            simState.current.standard.hits = saved.standardHits || 0;
-            simState.current.standard.cols = saved.standardCols || 0;
-            simState.current.swarm.hits = saved.swarmHits || 0;
-            simState.current.swarm.cols = saved.swarmCols || 0;
-            const syncInterval = setInterval(() => {
-                setStats({ 
-                    standard: {hits: simState.current.standard.hits, cols: simState.current.standard.cols}, 
-                    swarm: {hits: simState.current.swarm.hits, cols: simState.current.swarm.cols} 
-                });
-                localStorage.setItem('genesis_tech', JSON.stringify({ 
-                    standardHits: simState.current.standard.hits, standardCols: simState.current.standard.cols,
-                    swarmHits: simState.current.swarm.hits, swarmCols: simState.current.swarm.cols 
-                }));
-            }, 300);
-            return () => clearInterval(syncInterval);
-          }, []);
-
-          useEffect(() => {
-            const handleResize = () => {
-              [canvasStandardRef.current, canvasSwarmRef.current].forEach(canvas => {
-                if (canvas && canvas.parentElement) { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; }
-              });
-            };
-            window.addEventListener('resize', handleResize);
-            setTimeout(handleResize, 100);
-            return () => window.removeEventListener('resize', handleResize);
-          }, []);
-
-          const updateEngine = (s, canvas, isSwarm) => {
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d'); const cw = canvas.width; const ch = canvas.height;
-
-            const obstacles = [
-                { x: cw * 0.3, y: ch * 0.3, w: cw * 0.4, h: ch * 0.05 }, 
-                { x: cw * 0.3, y: ch * 0.3, w: cw * 0.05, h: ch * 0.4 }, 
-                { x: cw * 0.7 - cw * 0.05, y: ch * 0.3, w: cw * 0.05, h: ch * 0.4 }, 
-                { x: 0, y: ch * 0.75, w: cw * 0.25, h: ch * 0.05 }, 
-                { x: cw * 0.75, y: ch * 0.75, w: cw * 0.25, h: ch * 0.05 } 
-            ];
-
-            if (!s.init && cw > 0 && ch > 0) {
-                s.bots = [];
-                for(let i=0; i<20; i++) s.bots.push({ x: cw/2, y: ch*0.6, vx: (Math.random()-0.5)*4, vy: (Math.random()-0.5)*4, color: isSwarm ? '#34d399' : '#38bdf8', size: 2 });
-                s.init = true;
-            }
-            if (!s.init) return;
-
-            if (Date.now() - s.lastSpawn > 1500 && s.targets.length < 15) {
-                const corners = [
-                    { x: cw * 0.05, y: ch * 0.1 }, { x: cw * 0.95, y: ch * 0.1 },
-                    { x: cw * 0.05, y: ch * 0.9 }, { x: cw * 0.95, y: ch * 0.9 }
-                ];
-                const corner = corners[Math.floor(Math.random() * corners.length)];
-                s.targets.push({ x: corner.x + (Math.random()-0.5)*cw*0.05, y: corner.y + (Math.random()-0.5)*ch*0.05, consumed: false });
-                s.lastSpawn = Date.now();
-            }
-
-            s.bots.forEach(bot => {
-                let repulseX = 0; let repulseY = 0; let attractX = 0; let attractY = 0; let minDist = Infinity;
-                let hitWall = false;
-
-                if (isSwarm) {
-                    s.visitedNodes.forEach(node => {
-                        const dx = bot.x - node.x; const dy = bot.y - node.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 3000 && distSq > 0.1) { const dist = Math.sqrt(distSq); repulseX += (dx/dist) * 0.5; repulseY += (dy/dist) * 0.5; }
-                    });
-                    
-                    s.targets.forEach((target) => {
-                        if (target.consumed) return;
-                        const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                        if (distSq < 90000 && distSq < minDist) { minDist = distSq; const dist = Math.sqrt(distSq); attractX = (dx/dist) * 2.5; attractY = (dy/dist) * 2.5; }
-                    });
-
-                    // Holographic Boundary Prediction
-                    if (bot.x < 15) bot.vx += 0.5; else if (bot.x > cw - 15) bot.vx -= 0.5;
-                    if (bot.y < 15) bot.vy += 0.5; else if (bot.y > ch - 15) bot.vy -= 0.5;
-                    obstacles.forEach(obs => {
-                        if (bot.x > obs.x - 15 && bot.x < obs.x + obs.w + 15 && bot.y > obs.y - 15 && bot.y < obs.y + obs.h + 15) {
-                            if (bot.x < obs.x) bot.vx -= 0.6; else if (bot.x > obs.x + obs.w) bot.vx += 0.6;
-                            if (bot.y < obs.y) bot.vy -= 0.6; else if (bot.y > obs.y + obs.h) bot.vy += 0.6;
-                        }
-                    });
-                }
-
-                s.targets.forEach((target) => {
-                    if (target.consumed) return;
-                    const dx = target.x - bot.x; const dy = target.y - bot.y; const distSq = dx*dx + dy*dy;
-                    if (distSq < (isSwarm ? 225 : 64)) { target.consumed = true; s.hits += 1; }
-                });
-
-                if (isSwarm) {
-                    bot.vx += repulseX + attractX; bot.vy += repulseY + attractY;
-                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 5.5) { bot.vx = (bot.vx/speed)*5.5; bot.vy = (bot.vy/speed)*5.5; }
-                } else {
-                    bot.vx += (Math.random()-0.5) * 2.5; bot.vy += (Math.random()-0.5) * 2.5;
-                    const speed = Math.sqrt(bot.vx*bot.vx + bot.vy*bot.vy);
-                    if (speed > 3.0) { bot.vx = (bot.vx/speed)*3.0; bot.vy = (bot.vy/speed)*3.0; }
-                }
-
-                bot.x += bot.vx;
-                if (bot.x < 0) {bot.x=0; bot.vx *= -1; hitWall=true;} else if (bot.x > cw) {bot.x=cw; bot.vx *= -1; hitWall=true;}
-                obstacles.forEach(obs => {
-                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
-                        bot.x -= bot.vx; bot.vx *= -1; hitWall=true;
-                    }
-                });
-
-                bot.y += bot.vy;
-                if (bot.y < 0) {bot.y=0; bot.vy *= -1; hitWall=true;} else if (bot.y > ch) {bot.y=ch; bot.vy *= -1; hitWall=true;}
-                obstacles.forEach(obs => {
-                    if (bot.x > obs.x && bot.x < obs.x + obs.w && bot.y > obs.y && bot.y < obs.y + obs.h) {
-                        bot.y -= bot.vy; bot.vy *= -1; hitWall=true;
-                    }
-                });
-
-                if (hitWall) s.cols++;
-
-                if (isSwarm && Math.random() < 0.2) { s.visitedNodes.push({x: bot.x, y: bot.y, age: 100}); if (s.visitedNodes.length > 150) s.visitedNodes.shift(); }
-            });
-
-            s.targets = s.targets.filter(t => !t.consumed);
-            s.visitedNodes.forEach(n => n.age -= 1); s.visitedNodes = s.visitedNodes.filter(n => n.age > 0);
-
-            ctx.fillStyle = isSwarm ? 'rgba(2, 6, 23, 0.5)' : 'rgba(15, 5, 5, 0.5)'; ctx.fillRect(0, 0, cw, ch);
-            
-            ctx.fillStyle = 'rgba(8, 47, 73, 0.6)';
-            ctx.strokeStyle = 'rgba(14, 165, 233, 0.5)';
-            ctx.lineWidth = 1;
-            obstacles.forEach(obs => { ctx.fillRect(obs.x, obs.y, obs.w, obs.h); ctx.strokeRect(obs.x, obs.y, obs.w, obs.h); });
-
-            if (isSwarm) {
-                s.visitedNodes.forEach(node => { ctx.beginPath(); ctx.rect(node.x-1, node.y-1, 2, 2); ctx.fillStyle = `rgba(56, 189, 248, ${node.age/200})`; ctx.fill(); });
-                ctx.lineWidth = 0.5;
-                for(let i=0; i<s.bots.length; i++) {
-                    for(let j=i+1; j<s.bots.length; j++) {
-                        const b1 = s.bots[i]; const b2 = s.bots[j]; const dx = b1.x - b2.x; const dy = b1.y - b2.y;
-                        if (dx*dx + dy*dy < 10000) { ctx.beginPath(); ctx.moveTo(b1.x, b1.y); ctx.lineTo(b1.x, b2.y); ctx.lineTo(b2.x, b2.y); ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)'; ctx.stroke(); }
-                    }
-                }
-            }
-
-            s.targets.forEach(target => { ctx.beginPath(); ctx.arc(target.x, target.y, 4, 0, Math.PI*2); ctx.fillStyle = 'rgba(244, 63, 94, 0.8)'; ctx.fill(); });
-            s.bots.forEach(bot => { ctx.beginPath(); ctx.rect(bot.x-bot.size, bot.y-bot.size, bot.size*2, bot.size*2); ctx.fillStyle = bot.color; ctx.fill(); });
-          };
-
-          const update = () => {
-             updateEngine(simState.current.standard, canvasStandardRef.current, false);
-             updateEngine(simState.current.swarm, canvasSwarmRef.current, true);
-             requestRef.current = requestAnimationFrame(update);
-          };
-
-          useEffect(() => { requestRef.current = requestAnimationFrame(update); return () => cancelAnimationFrame(requestRef.current); }, []);
-
-          const handleReset = () => {
-             simState.current.standard.hits = 0; simState.current.standard.cols = 0;
-             simState.current.swarm.hits = 0; simState.current.swarm.cols = 0;
-             simState.current.standard.targets = []; simState.current.swarm.targets = [];
-             setStats({ standard: {hits: 0, cols: 0}, swarm: {hits: 0, cols: 0} });
-             localStorage.setItem('genesis_tech', JSON.stringify({ standardHits: 0, standardCols: 0, swarmHits: 0, swarmCols: 0 }));
-          };
-
-          return (
-             <div className="flex-1 flex flex-col xl:flex-row relative min-h-0 bg-slate-950 overflow-hidden">
-                <aside className="w-full xl:w-72 flex-shrink-0 bg-slate-900/80 border-b xl:border-b-0 xl:border-r border-sky-900/50 p-4 overflow-y-auto backdrop-blur-sm z-10 max-h-[40%] xl:max-h-none flex flex-col">
-                  <section className="space-y-3 flex-1">
-                    <div className="flex items-center gap-2">
-                        <CpuIcon size={18} className="text-sky-400" />
-                        <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Deep Learning</h2>
-                    </div>
-                    <div className="p-2 bg-slate-800/80 rounded-xl border border-sky-500/30 hidden md:block">
-                        <p className="text-[9px] text-slate-400 leading-relaxed">
-                            Left: Blind GD gets trapped in Local Minima and wastes compute. Right: Swarm shares memory to actively route around traps.
-                        </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 xl:grid-cols-1">
-                        <div className="p-2 bg-orange-900/30 rounded-xl border border-orange-700/50 shadow-inner">
-                            <div className="text-[9px] text-orange-300 uppercase font-bold mb-1 border-b border-orange-700/50 pb-1">M1: Blind GD</div>
-                            <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Minima Reached</div><div className="text-sm font-mono text-white leading-none">{stats.standard.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-red-400 uppercase">Wasted Cycles</div><div className="text-sm font-mono text-red-400 leading-none">{stats.standard.cols}</div></div>
-                            </div>
-                        </div>
-                        <div className="p-2 bg-emerald-900/30 rounded-xl border border-emerald-500/50 shadow-inner">
-                            <div className="text-[9px] text-emerald-300 uppercase font-bold mb-1 border-b border-emerald-600/50 pb-1">M2: Holo Swarm</div>
-                            <div className="flex justify-between items-end">
-                                <div><div className="text-[8px] text-slate-400 uppercase">Minima Reached</div><div className="text-sm font-mono text-white leading-none">{stats.swarm.hits}</div></div>
-                                <div className="text-right"><div className="text-[8px] text-emerald-400 uppercase">Wasted Cycles</div><div className="text-sm font-mono text-emerald-400 leading-none">{stats.swarm.cols}</div></div>
-                            </div>
-                        </div>
-                    </div>
-                  </section>
-                  <div className="pt-2 mt-auto">
-                    <button onClick={handleReset} className="w-full flex items-center justify-center gap-2 py-1.5 rounded-xl border border-sky-800 hover:bg-sky-800/50 text-sky-300 font-semibold text-xs transition-colors">
-                        <RefreshCw size={12} /> Reset A/B Stats
-                    </button>
-                  </div>
-                </aside>
-                
-                <div className="flex-1 flex flex-col md:flex-row relative min-h-0">
-                    <div className="flex-1 relative border-b md:border-b-0 md:border-r border-slate-800 overflow-hidden">
-                        <canvas ref={canvasStandardRef} className="absolute inset-0 w-full h-full block bg-[#0f0505]" />
-                        <div className="absolute top-2 left-2 bg-orange-950/90 px-2 py-1 rounded border border-orange-800 backdrop-blur-md pointer-events-none z-10">
-                            <span className="text-[9px] font-bold text-orange-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-orange-500/70">Method 1</span> Get Stuck (GD)</span>
-                        </div>
-                    </div>
-                    <div className="flex-1 relative overflow-hidden">
-                        <canvas ref={canvasSwarmRef} className="absolute inset-0 w-full h-full block bg-[#020617]" />
-                        <div className="absolute top-2 left-2 bg-emerald-950/90 px-2 py-1 rounded border border-emerald-800 backdrop-blur-md pointer-events-none z-10">
-                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider flex flex-col"><span className="text-[8px] text-emerald-500/70">Method 2</span> Swarm Optimizer</span>
-                        </div>
-                    </div>
-                </div>
-             </div>
-          );
-        };
-
-        // ==========================================
-        // MAIN APP CONTAINER
-        // ==========================================
-        const App = () => {
-          const [activeTab, setActiveTab] = useState(1);
-
-          return (
-            <div className="flex flex-col h-[100dvh] bg-slate-950 text-slate-100 font-sans overflow-hidden">
-              <header className="flex flex-col md:flex-row items-start md:items-center justify-between px-4 md:px-6 py-3 bg-slate-900/80 border-b border-slate-800 backdrop-blur-md z-20 gap-4 shadow-xl flex-shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                    <Activity size={24} />
-                  </div>
-                  <div>
-                    <h1 className="text-lg md:text-xl font-bold tracking-tight">Project Genesis</h1>
-                    <p className="text-[10px] md:text-xs text-slate-400 uppercase tracking-widest font-medium">Multi-Disciplinary Simulations</p>
-                  </div>
-                </div>
-
-                <div className="flex w-full md:w-auto overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-                    <div className="flex bg-slate-800/50 p-1 rounded-xl min-w-max">
-                        <button onClick={() => setActiveTab(1)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 1 ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <BoxIcon size={16} /> <span className="hidden sm:inline">Billiard</span> Inversion
-                        </button>
-                        <button onClick={() => setActiveTab(2)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 2 ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <NetworkIcon size={16} /> Zeta Swarm
-                        </button>
-                        <button onClick={() => setActiveTab(3)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 3 ? 'bg-rose-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <HeartPulse size={16} /> Medicine (A/B)
-                        </button>
-                        <button onClick={() => setActiveTab(4)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 4 ? 'bg-sky-500 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}>
-                            <CpuIcon size={16} /> Tech / DL (A/B)
-                        </button>
-                    </div>
-                </div>
-              </header>
-
-              <main className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
-                {activeTab === 1 && <BilliardSim />}
-                {activeTab === 2 && <ZetaSwarmSim />}
-                {activeTab === 3 && <MedicalSim />}
-                {activeTab === 4 && <TechSim />}
-              </main>
-            </div>
-          );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne+Mono&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        :root {
+            --plasma: #00ffe7;
+            --plasma-dim: rgba(0,255,231,0.15);
+            --plasma-glow: 0 0 20px rgba(0,255,231,0.4);
+            --void: #020810;
+            --amber: #ffb700;
+            --rose: #ff3e6c;
+            --grid-line: rgba(0,255,231,0.06);
+        }
+        * { box-sizing: border-box; }
+        body {
+            background: var(--void);
+            color: #c8d8e8;
+            font-family: 'Syne', sans-serif;
+            overflow: hidden;
+            height: 100dvh;
+        }
+        .mono { font-family: 'Syne Mono', monospace; }
+        
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+            pointer-events: none; z-index: 9999;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--plasma-dim); border-radius: 2px; }
+
+        /* Tab buttons */
+        .tab-btn {
+            font-family: 'Syne Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 6px 14px;
+            border: 1px solid rgba(0,255,231,0.15);
+            background: transparent;
+            color: rgba(200,216,232,0.5);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { border-color: rgba(0,255,231,0.4); color: var(--plasma); }
+        .tab-btn.active { background: rgba(0,255,231,0.1); border-color: var(--plasma); color: var(--plasma); box-shadow: var(--plasma-glow); }
+
+        /* Control sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%; height: 2px;
+            background: rgba(0,255,231,0.2);
+            outline: none; border-radius: 1px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--plasma);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--plasma);
+        }
+
+        /* Stat cards */
+        .stat-card {
+            background: rgba(0,255,231,0.03);
+            border: 1px solid rgba(0,255,231,0.12);
+            border-radius: 4px;
+            padding: 8px 10px;
+        }
+        .stat-val { font-family: 'Syne Mono', monospace; font-size: 18px; color: var(--plasma); }
+        .stat-label { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(200,216,232,0.4); }
+
+        /* Memory bus panel */
+        .memory-bus {
+            background: rgba(0,255,231,0.02);
+            border: 1px solid rgba(0,255,231,0.2);
+            border-radius: 4px;
+        }
+        .bus-header {
+            font-family: 'Syne Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--plasma);
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(0,255,231,0.1);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .bus-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--plasma); animation: pulse-dot 1.5s ease-in-out infinite; }
+        @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+        /* Export button */
+        .export-btn {
+            font-family: 'Syne Mono', monospace;
+            font-size: 9px; letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 5px 12px;
+            border: 1px solid rgba(0,255,231,0.3);
+            background: rgba(0,255,231,0.06);
+            color: var(--plasma);
+            cursor: pointer;
+            border-radius: 2px;
+            transition: all 0.2s;
+        }
+        .export-btn:hover { background: rgba(0,255,231,0.15); box-shadow: var(--plasma-glow); }
+
+        /* Log terminal */
+        .log-entry { animation: log-in 0.3s ease-out; }
+        @keyframes log-in { from { opacity:0; transform:translateX(-6px); } to { opacity:1; transform:translateX(0); } }
+
+        /* Section label */
+        .section-label {
+            font-family: 'Syne Mono', monospace;
+            font-size: 8px; letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: rgba(0,255,231,0.5);
+            margin-bottom: 6px;
+        }
+
+        /* Canvas parent bg */
+        .canvas-wrap { background: radial-gradient(ellipse at center, #040d1a 0%, var(--void) 100%); }
+
+        /* Checkbox toggle */
+        .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; }
+        .toggle-row label { font-size:10px; color:rgba(200,216,232,0.6); cursor:pointer; }
+        input[type=checkbox] { accent-color: var(--plasma); width:13px; height:13px; cursor:pointer; }
+
+        /* Header glow line */
+        .header-line { height:1px; background: linear-gradient(90deg, transparent, var(--plasma), transparent); opacity:0.4; }
+
+        /* Sidebar */
+        .sidebar { width:220px; flex-shrink:0; background:rgba(2,8,16,0.95); border-right:1px solid rgba(0,255,231,0.1); padding:12px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
+
+        /* Hologram pyramid overlay */
+        .pyramid-tip { position:absolute; font-family:'Syne Mono',monospace; font-size:8px; color:rgba(0,255,231,0.6); letter-spacing:0.1em; text-transform:uppercase; pointer-events:none; }
+
+        /* Squad color indicators */
+        .squad-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+
+        .scrollbar-hide::-webkit-scrollbar { display:none; }
+        .scrollbar-hide { -ms-overflow-style:none; scrollbar-width:none; }
     </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ============================================================
+// GENESIS MEMORY BUS — Universal shared state between all apps
+// All data written here is readable by any app on this device
+// ============================================================
+const MEMORY_BUS_KEY = 'genesis_memory_bus_v2';
+
+const MemoryBus = {
+    read() {
+        try { return JSON.parse(localStorage.getItem(MEMORY_BUS_KEY) || '{}'); }
+        catch { return {}; }
+    },
+    write(namespace, data) {
+        const bus = this.read();
+        bus[namespace] = { ...data, _ts: Date.now(), _ns: namespace };
+        bus._lastWrite = namespace;
+        bus._version = (bus._version || 0) + 1;
+        localStorage.setItem(MEMORY_BUS_KEY, JSON.stringify(bus));
+    },
+    readNamespace(namespace) {
+        const bus = this.read();
+        return bus[namespace] || null;
+    },
+    exportFull() {
+        const bus = this.read();
+        const blob = new Blob([JSON.stringify(bus, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url;
+        a.download = `genesis_memory_${Date.now()}.json`; a.click();
+        URL.revokeObjectURL(url);
+    },
+    clearNamespace(namespace) {
+        const bus = this.read();
+        delete bus[namespace];
+        localStorage.setItem(MEMORY_BUS_KEY, JSON.stringify(bus));
+    },
+    // Read coverage map as a normalized 0-1 grid (for next app consumption)
+    getCoverageGrid(namespace, gridW=20, gridH=20) {
+        const ns = this.readNamespace(namespace);
+        if (!ns || !ns.visitedNodes) return null;
+        const grid = Array.from({length:gridH}, () => new Array(gridW).fill(0));
+        ns.visitedNodes.forEach(n => {
+            const gx = Math.floor(n.x * gridW);
+            const gy = Math.floor(n.y * gridH);
+            if (gx >= 0 && gx < gridW && gy >= 0 && gy < gridH) grid[gy][gx] = Math.min(1, grid[gy][gx] + 0.2);
+        });
+        return grid;
+    }
+};
+
+// ============================================================
+// MATH UTILS
+// ============================================================
+const COMPOSITE_TARGETS = [6, 10, 12, 14, 20, 24, 28];
+const STRUCTURAL_PRIMES = [3, 5, 7, 11, 13];
+
+const getPrimeFactors = (n) => {
+    const map = { 6:"3×2", 10:"5×2", 12:"3×2²", 14:"7×2", 20:"5×2²", 24:"3×2³", 28:"7×2²" };
+    return map[n] || `${n}`;
+};
+
+const invertPoint = (x, y, cx, cy, r) => {
+    const dx = x-cx, dy = y-cy, d2 = dx*dx+dy*dy;
+    if (d2 < 0.0001) return {x, y};
+    const f = (r*r)/d2;
+    return {x: cx+dx*f, y: cy+dy*f};
+};
+
+const lerp = (a,b,t) => a+(b-a)*t;
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+
+// ============================================================
+// MINI ICONS
+// ============================================================
+const Icon = {
+    Activity: ({s=16}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+    Box: ({s=14}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>,
+    Network: ({s=14}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+    Heart: ({s=14}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>,
+    Cpu: ({s=14}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>,
+    Globe: ({s=14}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    Refresh: ({s=12}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+    Download: ({s=12}) => <svg width={s} height={s} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+};
+
+// ============================================================
+// MEMORY BUS PANEL — shown in all tabs
+// ============================================================
+const MemoryBusPanel = ({ busStats }) => {
+    const handleExport = () => MemoryBus.exportFull();
+
+    return (
+        <div className="memory-bus">
+            <div className="bus-header">
+                <div className="bus-dot"/>
+                Genesis Memory Bus
+            </div>
+            <div style={{padding:'8px 10px', display:'flex', flexDirection:'column', gap:4}}>
+                {['billiard','swarm','medical','tech'].map(ns => {
+                    const d = busStats[ns];
+                    return (
+                        <div key={ns} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span style={{fontSize:9, fontFamily:'Syne Mono,monospace', color:'rgba(0,255,231,0.5)', textTransform:'uppercase', letterSpacing:'0.1em'}}>{ns}</span>
+                            <span style={{fontSize:9, fontFamily:'Syne Mono,monospace', color: d ? '#00ffe7' : 'rgba(200,216,232,0.2)'}}>
+                                {d ? `v${d._version||0} · ${new Date(d._ts||0).toLocaleTimeString()}` : '—'}
+                            </span>
+                        </div>
+                    );
+                })}
+                <div style={{marginTop:4, display:'flex', gap:6}}>
+                    <button className="export-btn" onClick={handleExport} style={{flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:4}}>
+                        <Icon.Download s={10}/> Export JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// TAB 1: BILLIARD INVERSION — UPGRADED
+// True holographic Pepper's Ghost projection + inversion trails
+// Writes: inversion geometry paths, corner hits, winding numbers
+// ============================================================
+const BilliardSim = ({ busStats, onBusUpdate }) => {
+    const [isRunning, setIsRunning] = useState(false);
+    const [invRadius, setInvRadius] = useState(110);
+    const [speed, setSpeed] = useState(2);
+    const [particleCount, setParticleCount] = useState(3);
+    const [trailLen, setTrailLen] = useState(2500);
+    const [boundScale, setBoundScale] = useState(35);
+    const [showInvCircle, setShowInvCircle] = useState(true);
+    const [showGrid, setShowGrid] = useState(true);
+    const [pyramidMode, setPyramidMode] = useState(false);
+    const [showInversionPoints, setShowInversionPoints] = useState(true);
+
+    const [stats, setStats] = useState({ winding:0, corners:0, configs:0, invPoints:0 });
+
+    const canvasRef = useRef(null);
+    const rafRef = useRef(null);
+    const stateRef = useRef({
+        particles:[], gridPhase:0,
+        winding:0, corners:0, configs:0, invPoints:0,
+        inversionLog:[], // accumulated inversion coordinates for export
+        _busTimer:0
+    });
+
+    const COLORS = [
+        {std:'#00ffe7', inv:'rgba(0,255,231,', trail:'rgba(0,255,231,0.5)'},
+        {std:'#ff3e6c', inv:'rgba(255,62,108,', trail:'rgba(255,62,108,0.5)'},
+        {std:'#ffb700', inv:'rgba(255,183,0,', trail:'rgba(255,183,0,0.5)'},
+    ];
+
+    useEffect(() => {
+        const saved = MemoryBus.readNamespace('billiard');
+        if (saved) { stateRef.current.winding=saved.winding||0; stateRef.current.corners=saved.corners||0; stateRef.current.configs=saved.configs||0; }
+        const iv = setInterval(() => {
+            const s = stateRef.current;
+            setStats({winding:s.winding, corners:s.corners, configs:s.configs, invPoints:s.invPoints});
+            if (Date.now() - s._busTimer > 2000) {
+                // Normalize inversion log to 0-1 coords
+                const canvas = canvasRef.current;
+                const cw = canvas?.width||1, ch = canvas?.height||1;
+                const normLog = s.inversionLog.slice(-200).map(p => ({x:p.x/cw, y:p.y/ch}));
+                MemoryBus.write('billiard', {
+                    winding:s.winding, corners:s.corners, configs:s.configs,
+                    inversionPaths: normLog,
+                    invRadius, boundScale, particleCount,
+                    _version: (s.configs / 1000)|0
+                });
+                onBusUpdate();
+                s._busTimer = Date.now();
+            }
+        }, 400);
+        return () => clearInterval(iv);
+    }, [invRadius, boundScale, particleCount]);
+
+    useEffect(() => {
+        const canvas = canvasRef.current; if (!canvas) return;
+        const resize = () => {
+            canvas.width = canvas.parentElement?.clientWidth || 800;
+            canvas.height = canvas.parentElement?.clientHeight || 600;
+            stateRef.current.particles = [];
+        };
+        window.addEventListener('resize', resize);
+        setTimeout(resize, 80);
+        return () => window.removeEventListener('resize', resize);
+    }, []);
+
+    const draw = useCallback(() => {
+        const s = stateRef.current;
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const cw = canvas.width, ch = canvas.height;
+        const cx = cw/2, cy = ch/2;
+        const halfB = Math.min(cw,ch)*(boundScale/100)/2;
+
+        // Ensure particle count
+        while (s.particles.length < particleCount) {
+            const i = s.particles.length;
+            const vels = [{x:1.9,y:1.4},{x:-1.6,y:1.8},{x:1.5,y:-1.6}];
+            s.particles.push({pos:{x:cx,y:cy}, vel:{...vels[i%3]}, color:COLORS[i%3], stdPath:[], invPath:[]});
+        }
+        if (s.particles.length > particleCount) s.particles = s.particles.slice(0, particleCount);
+
+        // Physics
+        s.particles.forEach(p => {
+            for (let i=0; i<speed; i++) {
+                p.pos.x += p.vel.x; p.pos.y += p.vel.y;
+                const L=cx-halfB, R=cx+halfB, T=cy-halfB, Bo=cy+halfB;
+                let hx=false, hy=false;
+                if (p.pos.x<=L){p.vel.x*=-1;p.pos.x=L+1;hx=Math.abs(p.pos.y-T)<18||Math.abs(p.pos.y-Bo)<18;}
+                else if(p.pos.x>=R){p.vel.x*=-1;p.pos.x=R-1;hx=Math.abs(p.pos.y-T)<18||Math.abs(p.pos.y-Bo)<18;}
+                if (p.pos.y<=T){p.vel.y*=-1;p.pos.y=T+1;hy=Math.abs(p.pos.x-L)<18||Math.abs(p.pos.x-R)<18;}
+                else if(p.pos.y>=Bo){p.vel.y*=-1;p.pos.y=Bo-1;hy=Math.abs(p.pos.x-L)<18||Math.abs(p.pos.x-R)<18;}
+                if(hx||hy){ s.corners++; s.winding+=(p.vel.x*p.vel.y>0?1:-1); }
+
+                p.stdPath.push({x:p.pos.x,y:p.pos.y});
+                if(p.stdPath.length>trailLen) p.stdPath.shift();
+
+                const inv = invertPoint(p.pos.x,p.pos.y,cx,cy,invRadius);
+                p.invPath.push(inv);
+                if(p.invPath.length>trailLen) p.invPath.shift();
+                s.inversionLog.push(inv);
+                if(s.inversionLog.length>500) s.inversionLog.shift();
+                s.invPoints++;
+            }
+        });
+        s.gridPhase += 0.04*speed;
+        s.configs += speed*5*particleCount;
+
+        // ---- RENDER ----
+        if (pyramidMode) {
+            // Pyramid mode: pure black, crosshair guides, 4-way projection
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0,0,cw,ch);
+
+            // Alignment cross
+            ctx.strokeStyle = 'rgba(0,255,231,0.4)'; ctx.setLineDash([4,4]); ctx.lineWidth=0.5;
+            ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,ch); ctx.moveTo(0,cy); ctx.lineTo(cw,cy); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Central square marker
+            ctx.strokeStyle='rgba(0,255,231,0.25)'; ctx.lineWidth=0.5;
+            ctx.strokeRect(cx-halfB, cy-halfB, halfB*2, halfB*2);
+
+            // Diagonal fold lines for pyramid faces
+            ctx.strokeStyle='rgba(0,255,231,0.12)'; ctx.setLineDash([3,6]);
+            ctx.beginPath();
+            ctx.moveTo(cx-halfB,cy-halfB); ctx.lineTo(cx+halfB,cy+halfB);
+            ctx.moveTo(cx+halfB,cy-halfB); ctx.lineTo(cx-halfB,cy+halfB);
+            ctx.stroke(); ctx.setLineDash([]);
+
+            // Project particles to 4 faces
+            s.particles.forEach(p => {
+                const dx = p.pos.x-cx, dy = p.pos.y-cy;
+                // Use the INVERTED point for the projection — more interesting hologram geometry
+                const invCurr = invertPoint(p.pos.x,p.pos.y,cx,cy,invRadius);
+                const idx = invCurr.x-cx, idy = invCurr.y-cy;
+
+                const drawOrb = (px,py,col,sz=3) => {
+                    ctx.beginPath(); ctx.arc(px,py,sz,0,Math.PI*2);
+                    ctx.fillStyle=col; ctx.shadowBlur=14; ctx.shadowColor=col; ctx.fill(); ctx.shadowBlur=0;
+                };
+                const drawTrail = (path, offsetX, offsetY, col) => {
+                    if(path.length<2) return;
+                    ctx.beginPath(); ctx.moveTo(path[0].x-cx+cx+offsetX, path[0].y-cy+cy+offsetY);
+                    for(let i=1;i<path.length;i++) {
+                        ctx.lineTo(path[i].x-cx+cx+offsetX, path[i].y-cy+cy+offsetY);
+                    }
+                    ctx.strokeStyle=col; ctx.lineWidth=0.8; ctx.stroke();
+                };
+
+                // Bottom face
+                drawTrail(p.invPath.slice(-300), 0, halfB*2, p.color.trail);
+                drawOrb(cx+idx, cy+halfB*2+idy, p.color.std);
+                // Top face (inverted y)
+                drawTrail(p.invPath.slice(-300).map(pt=>({x:pt.x, y:cy*2-pt.y})), 0, -halfB*2, p.color.trail);
+                drawOrb(cx+idx, cy-halfB*2-idy, p.color.std);
+                // Right face (rotated)
+                drawTrail(p.invPath.slice(-300).map(pt=>({x:cy+pt.y-cy+cx, y:pt.x-cx+cy})), halfB*2, 0, p.color.trail);
+                drawOrb(cx+halfB*2+idy, cy+idx, p.color.std);
+                // Left face
+                drawTrail(p.invPath.slice(-300).map(pt=>({x:cy-(pt.y-cy)+cx, y:-(pt.x-cx)+cy})), -halfB*2, 0, p.color.trail);
+                drawOrb(cx-halfB*2-idy, cy-idx, p.color.std);
+
+                // Center particle
+                drawOrb(p.pos.x, p.pos.y, p.color.std, 2);
+            });
+
+            // Labels
+            ctx.fillStyle='rgba(0,255,231,0.5)'; ctx.font='8px Syne Mono,monospace'; ctx.textAlign='center';
+            ctx.fillText('▲ TOP',cx,cy-halfB*2-10);
+            ctx.fillText('▼ BOT',cx,cy+halfB*2+14);
+            ctx.fillText('◀ L',cx-halfB*2-18,cy+3);
+            ctx.fillText('R ▶',cx+halfB*2+18,cy+3);
+            ctx.fillText('⊕ CENTER',cx,cy+halfB+14);
+
+        } else {
+            // Standard mode
+            ctx.fillStyle='rgba(2,8,16,0.18)'; ctx.fillRect(0,0,cw,ch);
+
+            // Animated grid inside boundary
+            if (showGrid) {
+                ctx.strokeStyle='rgba(0,255,231,0.07)'; ctx.lineWidth=0.5; ctx.beginPath();
+                const ph = Math.sin(s.gridPhase)*15;
+                for(let i=-halfB;i<=halfB;i+=25){
+                    const x=cx+i+ph; if(x>cx-halfB&&x<cx+halfB){ctx.moveTo(x,cy-halfB);ctx.lineTo(x,cy+halfB);}
+                    const y=cy+i+Math.cos(s.gridPhase)*15; if(y>cy-halfB&&y<cy+halfB){ctx.moveTo(cx-halfB,y);ctx.lineTo(cx+halfB,y);}
+                }
+                ctx.stroke();
+            }
+
+            // Background grid
+            ctx.strokeStyle='rgba(0,255,231,0.03)'; ctx.lineWidth=0.5; ctx.beginPath();
+            for(let x=0;x<cw;x+=60){ctx.moveTo(x,0);ctx.lineTo(x,ch);}
+            for(let y=0;y<ch;y+=60){ctx.moveTo(0,y);ctx.lineTo(cw,y);}
+            ctx.stroke();
+
+            // Boundary box
+            ctx.strokeStyle='rgba(0,255,231,0.35)'; ctx.lineWidth=1;
+            ctx.strokeRect(cx-halfB,cy-halfB,halfB*2,halfB*2);
+
+            // Corner markers
+            const corners2 = [[cx-halfB,cy-halfB],[cx+halfB,cy-halfB],[cx+halfB,cy+halfB],[cx-halfB,cy+halfB]];
+            corners2.forEach(([x,y]) => {
+                ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2);
+                ctx.fillStyle='rgba(255,183,0,0.8)'; ctx.fill();
+            });
+
+            // Inversion circle
+            if (showInvCircle) {
+                ctx.beginPath(); ctx.arc(cx,cy,invRadius,0,Math.PI*2);
+                ctx.strokeStyle='rgba(0,255,231,0.2)'; ctx.setLineDash([5,5]); ctx.lineWidth=0.8; ctx.stroke(); ctx.setLineDash([]);
+                // Radius label
+                ctx.fillStyle='rgba(0,255,231,0.4)'; ctx.font='8px Syne Mono,monospace'; ctx.textAlign='left';
+                ctx.fillText(`r=${invRadius}px`, cx+invRadius+4, cy);
+            }
+
+            // Center cross
+            ctx.strokeStyle='rgba(0,255,231,0.15)'; ctx.lineWidth=0.5; ctx.beginPath();
+            ctx.moveTo(cx-8,cy); ctx.lineTo(cx+8,cy); ctx.moveTo(cx,cy-8); ctx.lineTo(cx,cy+8); ctx.stroke();
+
+            // Draw trails & particles
+            s.particles.forEach(p => {
+                // Standard path trail
+                if(p.stdPath.length>1){
+                    ctx.beginPath(); ctx.moveTo(p.stdPath[0].x,p.stdPath[0].y);
+                    for(let i=1;i<p.stdPath.length;i++) ctx.lineTo(p.stdPath[i].x,p.stdPath[i].y);
+                    ctx.strokeStyle=p.color.std+'30'; ctx.lineWidth=0.8; ctx.stroke();
+                }
+                // Inverted path trail — radial gradient
+                if(p.invPath.length>1){
+                    const grad = ctx.createRadialGradient(cx,cy,5,cx,cy,invRadius*1.8);
+                    grad.addColorStop(0,p.color.inv+'0.9)'); grad.addColorStop(1,p.color.inv+'0.05)');
+                    ctx.beginPath(); ctx.moveTo(p.invPath[0].x,p.invPath[0].y);
+                    for(let i=1;i<p.invPath.length;i++) ctx.lineTo(p.invPath[i].x,p.invPath[i].y);
+                    ctx.strokeStyle=grad; ctx.lineWidth=1.2; ctx.stroke();
+                }
+                // Current particle
+                ctx.beginPath(); ctx.arc(p.pos.x,p.pos.y,3.5,0,Math.PI*2);
+                ctx.fillStyle=p.color.std; ctx.shadowBlur=12; ctx.shadowColor=p.color.std; ctx.fill(); ctx.shadowBlur=0;
+
+                // Inversion ghost
+                if(showInversionPoints){
+                    const inv = invertPoint(p.pos.x,p.pos.y,cx,cy,invRadius);
+                    ctx.beginPath(); ctx.arc(inv.x,inv.y,5,0,Math.PI*2);
+                    ctx.strokeStyle=p.color.std; ctx.lineWidth=1.2; ctx.stroke();
+                    // connection line
+                    ctx.beginPath(); ctx.moveTo(p.pos.x,p.pos.y); ctx.lineTo(inv.x,inv.y);
+                    ctx.strokeStyle=p.color.inv+'0.15)'; ctx.lineWidth=0.5; ctx.setLineDash([3,6]); ctx.stroke(); ctx.setLineDash([]);
+                }
+            });
+
+            // Winding number arc visualization
+            const windNorm = Math.abs(s.winding % 100) / 100;
+            ctx.beginPath(); ctx.arc(cx,cy,invRadius*0.3,0,windNorm*Math.PI*2);
+            ctx.strokeStyle='rgba(255,183,0,0.3)'; ctx.lineWidth=1.5; ctx.stroke();
+        }
+
+        if (isRunning) rafRef.current = requestAnimationFrame(draw);
+    }, [isRunning, speed, invRadius, particleCount, boundScale, trailLen, showGrid, showInvCircle, pyramidMode, showInversionPoints]);
+
+    useEffect(() => {
+        if (isRunning) rafRef.current = requestAnimationFrame(draw);
+        else if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        return () => { if(rafRef.current) cancelAnimationFrame(rafRef.current); };
+    }, [isRunning, draw]);
+
+    const handleReset = () => {
+        stateRef.current.particles=[]; stateRef.current.winding=0; stateRef.current.corners=0; stateRef.current.configs=0;
+        stateRef.current.invPoints=0; stateRef.current.inversionLog=[];
+        setStats({winding:0,corners:0,configs:0,invPoints:0});
+        MemoryBus.clearNamespace('billiard'); onBusUpdate();
+    };
+
+    return (
+        <div style={{flex:1,display:'flex',flexDirection:'row',minHeight:0,overflow:'hidden'}}>
+            <div className="sidebar">
+                <div className="section-label">Billiard Inversion v2</div>
+                <div style={{display:'flex',gap:6}}>
+                    <button onClick={()=>setIsRunning(r=>!r)} style={{flex:1,fontFamily:'Syne Mono,monospace',fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',padding:'6px',border:`1px solid ${isRunning?'#ff3e6c':'#00ffe7'}`,background:isRunning?'rgba(255,62,108,0.1)':'rgba(0,255,231,0.1)',color:isRunning?'#ff3e6c':'#00ffe7',cursor:'pointer',borderRadius:2}}>
+                        {isRunning ? '⏸ Halt' : '▶ Start'}
+                    </button>
+                    <button onClick={handleReset} style={{padding:'6px 8px',border:'1px solid rgba(200,216,232,0.2)',background:'transparent',color:'rgba(200,216,232,0.4)',cursor:'pointer',borderRadius:2,fontSize:10}}>↺</button>
+                </div>
+
+                {[
+                    {label:'Simulators',min:1,max:3,val:particleCount,set:setParticleCount,unit:''},
+                    {label:'Inversion r',min:30,max:260,val:invRadius,set:setInvRadius,unit:'px',disabled:pyramidMode},
+                    {label:'Boundary',min:20,max:85,val:boundScale,set:setBoundScale,unit:'%'},
+                    {label:'Trail',min:200,max:8000,step:200,val:trailLen,set:setTrailLen,unit:'',disabled:pyramidMode},
+                    {label:'Speed',min:1,max:12,val:speed,set:setSpeed,unit:'×'},
+                ].map(({label,min,max,step=1,val,set,unit,disabled}) => (
+                    <div key={label} style={{opacity:disabled?0.4:1}}>
+                        <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                            <span style={{fontSize:9,color:'rgba(200,216,232,0.5)',textTransform:'uppercase',letterSpacing:'0.1em'}}>{label}</span>
+                            <span className="mono" style={{fontSize:9,color:'#00ffe7'}}>{val}{unit}</span>
+                        </div>
+                        <input type="range" min={min} max={max} step={step} value={val} onChange={e=>set(parseInt(e.target.value))} disabled={disabled}/>
+                    </div>
+                ))}
+
+                <div style={{borderTop:'1px solid rgba(0,255,231,0.1)',paddingTop:8,display:'flex',flexDirection:'column',gap:4}}>
+                    {[
+                        {label:'Pyramid Projector',val:pyramidMode,set:setPyramidMode},
+                        {label:'Dual Geometry Grid',val:showGrid,set:setShowGrid,disabled:pyramidMode},
+                        {label:'Inversion Circle',val:showInvCircle,set:setShowInvCircle,disabled:pyramidMode},
+                        {label:'Inversion Ghosts',val:showInversionPoints,set:setShowInversionPoints,disabled:pyramidMode},
+                    ].map(({label,val,set,disabled}) => (
+                        <div className="toggle-row" key={label} style={{opacity:disabled?0.4:1}}>
+                            <label>{label}</label>
+                            <input type="checkbox" checked={val} onChange={()=>set(v=>!v)} disabled={disabled}/>
+                        </div>
+                    ))}
+                    {pyramidMode && <p style={{fontSize:8,color:'rgba(0,255,231,0.6)',lineHeight:1.5,fontStyle:'italic'}}>Scale boundary ~30%. Place glass pyramid on center cross.</p>}
+                </div>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    {[
+                        {l:'Winding',v:stats.winding},
+                        {l:'Corners',v:stats.corners.toLocaleString()},
+                        {l:'Configs',v:(stats.configs/1000).toFixed(0)+'k'},
+                        {l:'Inv.Pts',v:(stats.invPoints/1000).toFixed(0)+'k'},
+                    ].map(({l,v}) => (
+                        <div className="stat-card" key={l}>
+                            <div className="stat-label">{l}</div>
+                            <div className="stat-val" style={{fontSize:13}}>{v}</div>
+                        </div>
+                    ))}
+                </div>
+
+                <MemoryBusPanel busStats={busStats}/>
+            </div>
+            <div style={{flex:1,position:'relative',minHeight:0}} className="canvas-wrap">
+                <canvas ref={canvasRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+                {!isRunning && (
+                    <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',pointerEvents:'none'}}>
+                        <span style={{fontFamily:'Syne Mono,monospace',fontSize:11,color:'rgba(0,255,231,0.3)',letterSpacing:'0.3em',textTransform:'uppercase'}}>Press Start</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// TAB 2: ZETA SWARM — UPGRADED
+// Full 3-squad system, emergent coordination, prime assimilation
+// Writes: coverage map, squad efficiency, anomaly log
+// ============================================================
+const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
+    const [isRunning, setIsRunning] = useState(true);
+    const [zetaSorted, setZetaSorted] = useState(0);
+    const [efficiency, setEfficiency] = useState(0);
+    const [dataLog, setDataLog] = useState([]);
+    const [coverage, setCoverage] = useState(0);
+
+    const canvasRef = useRef(null);
+    const rafRef = useRef(null);
+    const S = useRef({
+        bots:[], visitedNodes:[], zetaTargets:[],
+        lastSpawn:0, zetaCount:0, init:false, newLogs:[],
+        frame:0, totalCells:0, coveredCells:new Set(),
+        _busTimer:0, squadEfficiency:[0,0,0]
+    });
+
+    // 3 squads with distinct behaviors
+    const SQUADS = [
+        { id:0, color:'#00ffe7', name:'Alpha', count:3, behavior:'sweep_up',   speed:3.5 },
+        { id:1, color:'#ff3e6c', name:'Beta',  count:5, behavior:'sweep_down', speed:3.0 },
+        { id:2, color:'#ffb700', name:'Gamma', count:7, behavior:'radial',     speed:2.5 },
+    ];
+
+    useEffect(() => {
+        const saved = MemoryBus.readNamespace('swarm');
+        if (saved) S.current.zetaCount = saved.zetaCount || 0;
+        const iv = setInterval(() => {
+            const s = S.current;
+            setZetaSorted(s.zetaCount);
+            if (s.newLogs.length > 0) {
+                setDataLog(prev => [...s.newLogs, ...prev].slice(0,8));
+                s.newLogs = [];
+            }
+            // Coverage: what fraction of 40x40 grid has been visited
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const cw=canvas.width, ch=canvas.height;
+                const GW=40, GH=40;
+                s.visitedNodes.forEach(n => {
+                    const gx = Math.floor((n.x/cw)*GW), gy = Math.floor((n.y/ch)*GH);
+                    s.coveredCells.add(`${gx},${gy}`);
+                });
+                const cov = (s.coveredCells.size/(GW*GH)*100);
+                setCoverage(cov);
+                const eff = s.zetaCount / Math.max(1, s.frame/60);
+                setEfficiency(eff);
+
+                if (Date.now()-s._busTimer > 2000) {
+                    const normVisited = s.visitedNodes.slice(-150).map(n=>({x:n.x/cw,y:n.y/ch,age:n.age}));
+                    MemoryBus.write('swarm', {
+                        zetaCount:s.zetaCount, coverage:cov, efficiency:eff,
+                        visitedNodes: normVisited,
+                        squadEfficiency: s.squadEfficiency,
+                        _version: s.zetaCount
+                    });
+                    onBusUpdate();
+                    s._busTimer = Date.now();
+                }
+            }
+        }, 500);
+        return () => clearInterval(iv);
+    }, []);
+
+    useEffect(() => {
+        const canvas = canvasRef.current; if (!canvas) return;
+        const resize = () => {
+            canvas.width = canvas.parentElement?.clientWidth||800;
+            canvas.height = canvas.parentElement?.clientHeight||600;
+            S.current.init = false; S.current.bots = [];
+        };
+        window.addEventListener('resize', resize);
+        setTimeout(resize, 80);
+        return () => window.removeEventListener('resize', resize);
+    }, []);
+
+    const update = useCallback(() => {
+        const s = S.current;
+        const canvas = canvasRef.current; if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const cw=canvas.width, ch=canvas.height;
+        s.frame++;
+
+        if (!s.init && cw>0 && ch>0) {
+            s.bots = [];
+            SQUADS.forEach(sq => {
+                for (let i=0;i<sq.count;i++) {
+                    const angle = (i/sq.count)*Math.PI*2;
+                    s.bots.push({
+                        squad:sq.id, color:sq.color,
+                        x:cw/2+Math.cos(angle)*30, y:ch/2+Math.sin(angle)*30,
+                        vx:Math.cos(angle)*sq.speed, vy:Math.sin(angle)*sq.speed,
+                        speed:sq.speed, behavior:sq.behavior,
+                        hits:0, size:sq.id===0?3.5:sq.id===1?3:2.5
+                    });
+                }
+            });
+            s.init = true;
+        }
+        if (!s.init) return;
+
+        // Spawn targets
+        if (Date.now()-s.lastSpawn > 600 && s.zetaTargets.length < 30) {
+            const val = COMPOSITE_TARGETS[Math.floor(Math.random()*COMPOSITE_TARGETS.length)];
+            s.zetaTargets.push({x:20+Math.random()*(cw-40), y:20+Math.random()*(ch-40), val, pulse:0});
+            s.lastSpawn = Date.now();
+        }
+
+        s.bots.forEach(bot => {
+            let fx=0, fy=0;
+
+            // Repulsion from visited nodes (shared memory)
+            s.visitedNodes.forEach(n => {
+                const dx=bot.x-n.x, dy=bot.y-n.y, d2=dx*dx+dy*dy;
+                if(d2<3000&&d2>0.1){const d=Math.sqrt(d2); fx+=(dx/d)*0.5*(n.age/150); fy+=(dy/d)*0.5*(n.age/150);}
+            });
+
+            // Squad directive behavior (instead of same random walk for all)
+            if (bot.behavior==='sweep_up') {
+                // Alpha: sweep upward, bias toward top half
+                fy -= 0.3;
+                if (bot.y < ch*0.2) fy += 1.0; // bounce at top zone
+            } else if (bot.behavior==='sweep_down') {
+                // Beta: sweep downward
+                fy += 0.3;
+                if (bot.y > ch*0.8) fy -= 1.0;
+            } else {
+                // Gamma: radial — push outward from center
+                const dcx=bot.x-cw/2, dcy=bot.y-ch/2, d=Math.sqrt(dcx*dcx+dcy*dcy)||1;
+                fx += (dcx/d)*0.4; fy += (dcy/d)*0.4;
+            }
+
+            // Attraction to nearest target
+            let minD = Infinity;
+            s.zetaTargets.forEach(t => {
+                const dx=t.x-bot.x, dy=t.y-bot.y, d2=dx*dx+dy*dy;
+                if(d2<120000&&d2>0.1&&d2<minD){
+                    minD=d2; const d=Math.sqrt(d2);
+                    const str=(t.val/28)*2.5;
+                    fx+=(dx/d)*str; fy+=(dy/d)*str;
+                }
+            });
+
+            // Boundary push
+            const M=18;
+            if(bot.x<M)fx+=1.2; else if(bot.x>cw-M)fx-=1.2;
+            if(bot.y<M)fy+=1.2; else if(bot.y>ch-M)fy-=1.2;
+
+            bot.vx += fx + (Math.random()-0.5)*0.4;
+            bot.vy += fy + (Math.random()-0.5)*0.4;
+            const sp = Math.sqrt(bot.vx*bot.vx+bot.vy*bot.vy);
+            if(sp>bot.speed){bot.vx=(bot.vx/sp)*bot.speed; bot.vy=(bot.vy/sp)*bot.speed;}
+
+            bot.x += bot.vx; bot.y += bot.vy;
+            bot.x=clamp(bot.x,0,cw); bot.y=clamp(bot.y,0,ch);
+
+            // Leave memory trail
+            if(Math.random()<0.18){ s.visitedNodes.push({x:bot.x,y:bot.y,age:180,squad:bot.squad}); if(s.visitedNodes.length>300) s.visitedNodes.shift(); }
+        });
+
+        // Consume targets
+        s.zetaTargets.forEach(t => {
+            t.pulse = (t.pulse||0)+0.08;
+            s.bots.forEach(bot => {
+                if(!t.consumed){ const dx=t.x-bot.x,dy=t.y-bot.y; if(dx*dx+dy*dy<500){
+                    t.consumed=true; s.zetaCount++; s.squadEfficiency[bot.squad]++;
+                    s.newLogs.push({id:Math.random().toString(), text:`[${SQUADS[bot.squad].name}] ${t.val} → ${getPrimeFactors(t.val)}`});
+                }}
+            });
+        });
+        s.zetaTargets = s.zetaTargets.filter(t=>!t.consumed);
+        s.visitedNodes.forEach(n=>n.age-=1); s.visitedNodes=s.visitedNodes.filter(n=>n.age>0);
+
+        // ---- RENDER ----
+        ctx.fillStyle='rgba(2,8,16,0.25)'; ctx.fillRect(0,0,cw,ch);
+
+        // Background grid
+        ctx.strokeStyle='rgba(0,255,231,0.05)'; ctx.lineWidth=0.5; ctx.beginPath();
+        for(let x=0;x<cw;x+=50){ctx.moveTo(x,0);ctx.lineTo(x,ch);}
+        for(let y=0;y<ch;y+=50){ctx.moveTo(0,y);ctx.lineTo(cw,y);}
+        ctx.stroke();
+
+        // Visited node heatmap
+        s.visitedNodes.forEach(n=>{
+            const col = n.squad===0?'0,255,231':n.squad===1?'255,62,108':'255,183,0';
+            ctx.beginPath(); ctx.arc(n.x,n.y,3,0,Math.PI*2);
+            ctx.fillStyle=`rgba(${col},${n.age/600})`; ctx.fill();
+        });
+
+        // Mesh lines between nearby same-squad bots
+        SQUADS.forEach(sq=>{
+            const squadBots = s.bots.filter(b=>b.squad===sq.id);
+            ctx.lineWidth=0.4;
+            for(let i=0;i<squadBots.length;i++){
+                for(let j=i+1;j<squadBots.length;j++){
+                    const b1=squadBots[i],b2=squadBots[j];
+                    const dx=b1.x-b2.x,dy=b1.y-b2.y;
+                    if(dx*dx+dy*dy<25000){
+                        ctx.beginPath(); ctx.moveTo(b1.x,b1.y); ctx.lineTo(b2.x,b2.y);
+                        ctx.strokeStyle=sq.color+'40'; ctx.stroke();
+                    }
+                }
+            }
+        });
+
+        // Targets
+        s.zetaTargets.forEach(t=>{
+            const pulse = Math.sin(t.pulse||0)*3;
+            ctx.beginPath(); ctx.rect(t.x-9-pulse/2,t.y-9-pulse/2,18+pulse,18+pulse);
+            ctx.strokeStyle='#4ade80'; ctx.lineWidth=1.2; ctx.stroke();
+            ctx.fillStyle='rgba(74,222,128,0.1)'; ctx.fill();
+            ctx.fillStyle='#4ade80'; ctx.font='10px Syne Mono,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
+            ctx.fillText(t.val,t.x,t.y);
+        });
+
+        // Bots
+        s.bots.forEach(bot=>{
+            ctx.beginPath(); ctx.arc(bot.x,bot.y,bot.size,0,Math.PI*2);
+            ctx.fillStyle=bot.color; ctx.shadowBlur=10; ctx.shadowColor=bot.color; ctx.fill(); ctx.shadowBlur=0;
+        });
+
+        if (isRunning) rafRef.current = requestAnimationFrame(update);
+    }, [isRunning]);
+
+    useEffect(()=>{
+        if(isRunning) rafRef.current=requestAnimationFrame(update);
+        else if(rafRef.current) cancelAnimationFrame(rafRef.current);
+        return ()=>{if(rafRef.current) cancelAnimationFrame(rafRef.current);};
+    },[isRunning,update]);
+
+    const handleReset = () => {
+        S.current.zetaCount=0; S.current.newLogs=[]; S.current.bots=[]; S.current.init=false;
+        S.current.coveredCells=new Set(); S.current.squadEfficiency=[0,0,0];
+        setZetaSorted(0); setDataLog([]); setCoverage(0);
+        MemoryBus.clearNamespace('swarm'); onBusUpdate();
+    };
+
+    return (
+        <div style={{flex:1,display:'flex',minHeight:0,overflow:'hidden'}}>
+            <div className="sidebar">
+                <div className="section-label">Zeta Swarm v2</div>
+                <div style={{display:'flex',gap:6}}>
+                    <button onClick={()=>setIsRunning(r=>!r)} style={{flex:1,fontFamily:'Syne Mono,monospace',fontSize:10,letterSpacing:'0.1em',textTransform:'uppercase',padding:'6px',border:`1px solid ${isRunning?'#ff3e6c':'#00ffe7'}`,background:isRunning?'rgba(255,62,108,0.1)':'rgba(0,255,231,0.1)',color:isRunning?'#ff3e6c':'#00ffe7',cursor:'pointer',borderRadius:2}}>
+                        {isRunning?'⏸ Halt':'▶ Run'}
+                    </button>
+                    <button onClick={handleReset} style={{padding:'6px 8px',border:'1px solid rgba(200,216,232,0.2)',background:'transparent',color:'rgba(200,216,232,0.4)',cursor:'pointer',borderRadius:2,fontSize:10}}>↺</button>
+                </div>
+
+                {/* Squad legend */}
+                <div>
+                    <div className="section-label">Squads</div>
+                    {SQUADS.map(sq=>(
+                        <div key={sq.id} style={{display:'flex',alignItems:'center',gap:7,marginBottom:5}}>
+                            <div className="squad-dot" style={{background:sq.color,boxShadow:`0 0 6px ${sq.color}`}}/>
+                            <div style={{flex:1}}>
+                                <div style={{fontSize:9,color:'rgba(200,216,232,0.8)',letterSpacing:'0.05em'}}>{sq.name} ({sq.count}) — {sq.behavior}</div>
+                                <div style={{height:2,background:'rgba(200,216,232,0.1)',borderRadius:1,marginTop:2}}>
+                                    <div style={{height:'100%',background:sq.color,borderRadius:1,width:`${Math.min(100,(S.current.squadEfficiency?.[sq.id]||0)/Math.max(1,zetaSorted)*100)}%`,transition:'width 0.5s'}}/>
+                                </div>
+                            </div>
+                            <span className="mono" style={{fontSize:9,color:sq.color}}>{S.current.squadEfficiency?.[sq.id]||0}</span>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Stats */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    {[
+                        {l:'Assimilated',v:zetaSorted.toLocaleString()},
+                        {l:'Coverage',v:`${coverage.toFixed(1)}%`},
+                        {l:'Efficiency',v:`${efficiency.toFixed(2)}/s`},
+                        {l:'Memory Nodes',v:S.current.visitedNodes?.length||0},
+                    ].map(({l,v})=>(
+                        <div className="stat-card" key={l}>
+                            <div className="stat-label">{l}</div>
+                            <div className="stat-val" style={{fontSize:12}}>{v}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Live terminal */}
+                <div className="memory-bus" style={{flex:1,display:'flex',flexDirection:'column',minHeight:100}}>
+                    <div className="bus-header"><div className="bus-dot"/>Math Terminal</div>
+                    <div style={{padding:'6px 8px',flex:1,overflow:'hidden',display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:2}}>
+                        {dataLog.length===0 && <span style={{fontSize:9,color:'rgba(200,216,232,0.2)',fontStyle:'italic'}}>Awaiting targets...</span>}
+                        {dataLog.map((log,i)=>(
+                            <div key={log.id} className="log-entry mono" style={{fontSize:9,color:i===0?'#00ffe7':'rgba(200,216,232,0.5)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                                › {log.text}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <MemoryBusPanel busStats={busStats}/>
+            </div>
+            <div style={{flex:1,position:'relative',minHeight:0}} className="canvas-wrap">
+                <canvas ref={canvasRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// TAB 3: MEDICAL A/B — UPGRADED
+// Blind random walk vs Smart swarm with prime-node avoidance
+// Writes: tissue coverage, damage count, pathogen hits
+// ============================================================
+const MedicalSim = ({ busStats, onBusUpdate }) => {
+    const canvasStdRef = useRef(null);
+    const canvasSwRef = useRef(null);
+    const rafRef = useRef(null);
+    const [stats, setStats] = useState({std:{hits:0,cols:0,damage:0},sw:{hits:0,cols:0,damage:0}});
+
+    const S = useRef({
+        std:  {bots:[],visited:[],targets:[],healthy:[],lastSpawn:0,hits:0,cols:0,damage:0,init:false},
+        sw:   {bots:[],visited:[],targets:[],healthy:[],lastSpawn:0,hits:0,cols:0,damage:0,init:false},
+        _busTimer:0
+    });
+
+    const OBSTACLES = (cw,ch) => [
+        {x:cw*0.18,y:0,w:cw*0.05,h:ch*0.42},
+        {x:cw*0.18,y:ch*0.58,w:cw*0.05,h:ch*0.42},
+        {x:cw*0.46,y:ch*0.18,w:cw*0.05,h:ch*0.64},
+        {x:cw*0.74,y:0,w:cw*0.05,h:ch*0.32},
+        {x:cw*0.74,y:ch*0.68,w:cw*0.05,h:ch*0.32},
+    ];
+
+    useEffect(() => {
+        const saved = MemoryBus.readNamespace('medical');
+        if (saved) {
+            S.current.std.hits=saved.stdHits||0; S.current.std.damage=saved.stdDamage||0;
+            S.current.sw.hits=saved.swHits||0; S.current.sw.damage=saved.swDamage||0;
+        }
+        const iv = setInterval(() => {
+            const {std,sw}=S.current;
+            setStats({std:{hits:std.hits,cols:std.cols,damage:std.damage},sw:{hits:sw.hits,cols:sw.cols,damage:sw.damage}});
+            if(Date.now()-S.current._busTimer>2000){
+                MemoryBus.write('medical',{
+                    stdHits:std.hits,stdDamage:std.damage,
+                    swHits:sw.hits,swDamage:sw.damage,
+                    efficiency:sw.hits/Math.max(1,std.hits),
+                    damageReduction:1-sw.damage/Math.max(1,std.damage),
+                    _version:sw.hits
+                });
+                onBusUpdate();
+                S.current._busTimer=Date.now();
+            }
+        },300);
+        return ()=>clearInterval(iv);
+    },[]);
+
+    useEffect(()=>{
+        const resize=()=>{
+            [canvasStdRef,canvasSwRef].forEach(r=>{
+                if(r.current?.parentElement){r.current.width=r.current.parentElement.clientWidth;r.current.height=r.current.parentElement.clientHeight;}
+            });
+        };
+        window.addEventListener('resize',resize); setTimeout(resize,80);
+        return()=>window.removeEventListener('resize',resize);
+    },[]);
+
+    const runEngine = (s, canvas, isSwarm) => {
+        if (!canvas) return;
+        const ctx=canvas.getContext('2d'), cw=canvas.width, ch=canvas.height;
+        const obs=OBSTACLES(cw,ch);
+
+        if (!s.init && cw>0 && ch>0) {
+            s.bots=[];
+            for(let i=0;i<15;i++) s.bots.push({x:cw/2,y:ch/2,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*3,color:isSwarm?'#34d399':'#fb923c',size:2.5});
+            s.healthy=[];
+            for(let i=0;i<22;i++) s.healthy.push({x:20+Math.random()*(cw-40),y:20+Math.random()*(ch-40),val:STRUCTURAL_PRIMES[Math.floor(Math.random()*3)],cd:0});
+            s.init=true;
+        }
+        if(!s.init) return;
+
+        if(Date.now()-s.lastSpawn>1200&&s.targets.length<12){
+            const pts=[{x:cw*0.05,y:ch*0.1},{x:cw*0.92,y:ch*0.1},{x:cw*0.05,y:ch*0.88},{x:cw*0.92,y:ch*0.88},{x:cw*0.3,y:ch*0.5},{x:cw*0.7,y:ch*0.5}];
+            const pt=pts[Math.floor(Math.random()*pts.length)];
+            s.targets.push({x:pt.x+(Math.random()-0.5)*cw*0.04,y:pt.y+(Math.random()-0.5)*ch*0.04,val:COMPOSITE_TARGETS[Math.floor(Math.random()*COMPOSITE_TARGETS.length)],consumed:false});
+            s.lastSpawn=Date.now();
+        }
+
+        s.healthy.forEach(h=>{if(h.cd>0)h.cd--;});
+
+        s.bots.forEach(bot=>{
+            let fx=0,fy=0,wall=false;
+            if(isSwarm){
+                // Repulse from visited nodes
+                s.visited.forEach(n=>{const dx=bot.x-n.x,dy=bot.y-n.y,d2=dx*dx+dy*dy;if(d2<2800&&d2>0.1){const d=Math.sqrt(d2);fx+=(dx/d)*0.35;fy+=(dy/d)*0.35;}});
+                // Repulse from healthy prime nodes
+                s.healthy.forEach(h=>{const dx=bot.x-h.x,dy=bot.y-h.y,d2=dx*dx+dy*dy;if(d2<4000&&d2>0.1){const d=Math.sqrt(d2);const str=h.val*0.12;fx+=(dx/d)*str;fy+=(dy/d)*str;}});
+                // Attract to targets
+                s.targets.forEach(t=>{if(t.consumed)return;const dx=t.x-bot.x,dy=t.y-bot.y,d2=dx*dx+dy*dy;if(d2<65000&&d2>0.1){const d=Math.sqrt(d2);const str=(t.val/28)*3.2;fx+=(dx/d)*str;fy+=(dy/d)*str;}});
+                // Boundary
+                const M=14;if(bot.x<M)fx+=0.8;else if(bot.x>cw-M)fx-=0.8;if(bot.y<M)fy+=0.8;else if(bot.y>ch-M)fy-=0.8;
+                // Obstacle avoidance
+                obs.forEach(o=>{if(bot.x>o.x-14&&bot.x<o.x+o.w+14&&bot.y>o.y-14&&bot.y<o.y+o.h+14){if(bot.x<o.x)fx-=0.7;else if(bot.x>o.x+o.w)fx+=0.7;if(bot.y<o.y)fy-=0.7;else if(bot.y>o.y+o.h)fy+=0.7;}});
+            } else {
+                // Blind random walk — sometimes attracted to targets but no memory
+                s.targets.forEach(t=>{if(t.consumed)return;const dx=t.x-bot.x,dy=t.y-bot.y,d2=dx*dx+dy*dy;if(d2<20000&&d2>0.1){const d=Math.sqrt(d2);fx+=(dx/d)*0.5;fy+=(dy/d)*0.5;}});
+                // Collide with healthy cells (damage)
+                s.healthy.forEach(h=>{const dx=bot.x-h.x,dy=bot.y-h.y,d2=dx*dx+dy*dy;if(d2<180&&h.cd===0){bot.vx*=-1.2;bot.vy*=-1.2;s.damage++;h.cd=25;}});
+            }
+
+            // Consume targets
+            s.targets.forEach(t=>{if(!t.consumed){const dx=t.x-bot.x,dy=t.y-bot.y;if(dx*dx+dy*dy<(isSwarm?280:80)){t.consumed=true;s.hits++;}}});
+
+            if(isSwarm){bot.vx+=fx+(Math.random()-0.5)*0.3;bot.vy+=fy+(Math.random()-0.5)*0.3;const sp=Math.sqrt(bot.vx*bot.vx+bot.vy*bot.vy);if(sp>4.5){bot.vx=(bot.vx/sp)*4.5;bot.vy=(bot.vy/sp)*4.5;}}
+            else{bot.vx+=(Math.random()-0.5)*1.5;bot.vy+=(Math.random()-0.5)*1.5;const sp=Math.sqrt(bot.vx*bot.vx+bot.vy*bot.vy);if(sp>2.5){bot.vx=(bot.vx/sp)*2.5;bot.vy=(bot.vy/sp)*2.5;}}
+
+            bot.x+=bot.vx; bot.y+=bot.vy;
+            if(bot.x<0){bot.x=0;bot.vx*=-1;wall=true;}else if(bot.x>cw){bot.x=cw;bot.vx*=-1;wall=true;}
+            if(bot.y<0){bot.y=0;bot.vy*=-1;wall=true;}else if(bot.y>ch){bot.y=ch;bot.vy*=-1;wall=true;}
+            obs.forEach(o=>{if(bot.x>o.x&&bot.x<o.x+o.w&&bot.y>o.y&&bot.y<o.y+o.h){bot.x-=bot.vx;bot.vx*=-1;bot.y-=bot.vy;bot.vy*=-1;wall=true;}});
+            if(wall)s.cols++;
+            if(isSwarm&&Math.random()<0.2){s.visited.push({x:bot.x,y:bot.y,age:90});if(s.visited.length>160)s.visited.shift();}
+        });
+
+        s.targets=s.targets.filter(t=>!t.consumed);
+        s.visited.forEach(n=>n.age--); s.visited=s.visited.filter(n=>n.age>0);
+
+        // ---- RENDER ----
+        ctx.fillStyle=isSwarm?'rgba(2,8,16,0.3)':'rgba(15,5,5,0.3)'; ctx.fillRect(0,0,cw,ch);
+
+        // Obstacles (tissue walls)
+        ctx.fillStyle='rgba(159,18,57,0.4)'; ctx.strokeStyle='rgba(244,63,94,0.5)'; ctx.lineWidth=1;
+        obs.forEach(o=>{ctx.fillRect(o.x,o.y,o.w,o.h);ctx.strokeRect(o.x,o.y,o.w,o.h);});
+
+        // Healthy cells (prime nodes)
+        s.healthy.forEach(h=>{
+            ctx.beginPath(); ctx.arc(h.x,h.y,8,0,Math.PI*2);
+            ctx.fillStyle=h.cd>0?'rgba(239,68,68,0.3)':'rgba(52,211,153,0.15)';ctx.fill();
+            ctx.strokeStyle=h.cd>0?'#ef4444':'#34d399';ctx.lineWidth=0.8;ctx.stroke();
+            ctx.fillStyle=h.cd>0?'#ef4444':'#34d399';ctx.font='7px Syne Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText(h.val,h.x,h.y);
+        });
+
+        if(isSwarm){
+            s.visited.forEach(n=>{ctx.beginPath();ctx.arc(n.x,n.y,2.5,0,Math.PI*2);ctx.fillStyle=`rgba(244,114,182,${n.age/300})`;ctx.fill();});
+            ctx.lineWidth=0.4;
+            for(let i=0;i<s.bots.length;i++)for(let j=i+1;j<s.bots.length;j++){
+                const b1=s.bots[i],b2=s.bots[j],dx=b1.x-b2.x,dy=b1.y-b2.y;
+                if(dx*dx+dy*dy<9000){ctx.beginPath();ctx.moveTo(b1.x,b1.y);ctx.lineTo(b2.x,b2.y);ctx.strokeStyle='rgba(248,113,113,0.25)';ctx.stroke();}
+            }
+        }
+
+        s.targets.forEach(t=>{
+            ctx.beginPath();ctx.arc(t.x,t.y,10,0,Math.PI*2);
+            ctx.fillStyle='rgba(254,240,138,0.15)';ctx.fill();
+            ctx.strokeStyle='#fef08a';ctx.lineWidth=1.2;ctx.stroke();
+            ctx.fillStyle='#fef08a';ctx.font='9px Syne Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText(t.val,t.x,t.y);
+        });
+
+        s.bots.forEach(bot=>{ctx.beginPath();ctx.arc(bot.x,bot.y,bot.size,0,Math.PI*2);ctx.fillStyle=bot.color;ctx.shadowBlur=8;ctx.shadowColor=bot.color;ctx.fill();ctx.shadowBlur=0;});
+    };
+
+    const update = useCallback(()=>{
+        runEngine(S.current.std, canvasStdRef.current, false);
+        runEngine(S.current.sw, canvasSwRef.current, true);
+        rafRef.current=requestAnimationFrame(update);
+    },[]);
+
+    useEffect(()=>{rafRef.current=requestAnimationFrame(update);return()=>cancelAnimationFrame(rafRef.current);},[update]);
+
+    const handleReset=()=>{
+        ['std','sw'].forEach(k=>{S.current[k]={bots:[],visited:[],targets:[],healthy:[],lastSpawn:0,hits:0,cols:0,damage:0,init:false};});
+        setStats({std:{hits:0,cols:0,damage:0},sw:{hits:0,cols:0,damage:0}});
+        MemoryBus.clearNamespace('medical'); onBusUpdate();
+    };
+
+    const improvement = stats.std.hits>0 ? ((stats.sw.hits/stats.std.hits-1)*100).toFixed(0) : '—';
+    const dmgSaved = stats.std.damage>0 ? ((1-stats.sw.damage/stats.std.damage)*100).toFixed(0) : '—';
+
+    return (
+        <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>
+            {/* Stats bar */}
+            <div style={{display:'flex',alignItems:'stretch',gap:0,background:'rgba(2,8,16,0.8)',borderBottom:'1px solid rgba(0,255,231,0.1)',flexShrink:0}}>
+                {[
+                    {l:'Method',v:'Blind GD',col:'#fb923c'},
+                    {l:'Pathogen Hits',v:stats.std.hits},
+                    {l:'Cell Damage',v:stats.std.damage,col:'#ef4444'},
+                    {l:'',v:'vs',col:'rgba(200,216,232,0.3)'},
+                    {l:'Method',v:'Holo Swarm',col:'#34d399'},
+                    {l:'Pathogen Hits',v:stats.sw.hits,col:'#34d399'},
+                    {l:'Cell Damage',v:stats.sw.damage,col:'#34d399'},
+                    {l:'Hit Boost',v:improvement==='—'?'—':`+${improvement}%`,col:'#00ffe7'},
+                    {l:'Dmg Saved',v:dmgSaved==='—'?'—':`${dmgSaved}%`,col:'#00ffe7'},
+                ].map(({l,v,col},i)=>(
+                    <div key={i} style={{flex:1,padding:'6px 10px',borderRight:'1px solid rgba(0,255,231,0.06)',textAlign:'center'}}>
+                        <div style={{fontSize:8,textTransform:'uppercase',letterSpacing:'0.1em',color:'rgba(200,216,232,0.35)',marginBottom:2}}>{l}</div>
+                        <div className="mono" style={{fontSize:13,color:col||'#c8d8e8'}}>{v}</div>
+                    </div>
+                ))}
+                <button onClick={handleReset} style={{padding:'0 14px',border:'none',borderLeft:'1px solid rgba(0,255,231,0.1)',background:'transparent',color:'rgba(0,255,231,0.5)',cursor:'pointer',fontSize:11}}>↺</button>
+            </div>
+            <div style={{flex:1,display:'flex',minHeight:0}}>
+                <div style={{flex:1,position:'relative',borderRight:'1px solid rgba(0,255,231,0.08)'}} className="canvas-wrap">
+                    <canvas ref={canvasStdRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+                    <div style={{position:'absolute',top:8,left:8,fontFamily:'Syne Mono,monospace',fontSize:9,color:'#fb923c',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(15,5,5,0.8)',padding:'4px 8px',border:'1px solid rgba(251,146,60,0.3)'}}>
+                        M1 · Blind Random Walk
+                    </div>
+                </div>
+                <div style={{flex:1,position:'relative'}} className="canvas-wrap">
+                    <canvas ref={canvasSwRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+                    <div style={{position:'absolute',top:8,left:8,fontFamily:'Syne Mono,monospace',fontSize:9,color:'#34d399',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(2,8,16,0.8)',padding:'4px 8px',border:'1px solid rgba(52,211,153,0.3)'}}>
+                        M2 · Holographic Swarm
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// TAB 4: TECH/DL A/B — UPGRADED
+// Blind GD vs Swarm Optimizer on loss landscape
+// Reads swarm data from bus to seed avoidance map
+// Writes: minima found, wasted compute, efficiency ratio
+// ============================================================
+const TechSim = ({ busStats, onBusUpdate }) => {
+    const canvasStdRef = useRef(null);
+    const canvasSwRef = useRef(null);
+    const rafRef = useRef(null);
+    const [stats, setStats] = useState({std:{hits:0,cols:0},sw:{hits:0,cols:0}});
+
+    const S = useRef({
+        std:  {bots:[],visited:[],targets:[],lastSpawn:0,hits:0,cols:0,init:false},
+        sw:   {bots:[],visited:[],targets:[],lastSpawn:0,hits:0,cols:0,init:false},
+        _busTimer:0
+    });
+
+    const LOSS_OBS = (cw,ch) => [
+        // Loss landscape "walls" — local minima traps
+        {x:cw*0.28,y:ch*0.28,w:cw*0.44,h:ch*0.05},
+        {x:cw*0.28,y:ch*0.28,w:cw*0.05,h:ch*0.44},
+        {x:cw*0.67,y:ch*0.28,w:cw*0.05,h:ch*0.44},
+        {x:0,y:ch*0.72,w:cw*0.22,h:ch*0.05},
+        {x:cw*0.78,y:ch*0.72,w:cw*0.22,h:ch*0.05},
+    ];
+
+    // Seed swarm with previously learned coverage from memory bus
+    const seedFromBus = (s, cw, ch) => {
+        const swarmData = MemoryBus.readNamespace('swarm');
+        if (swarmData?.visitedNodes) {
+            swarmData.visitedNodes.forEach(n => {
+                s.visited.push({x:n.x*cw, y:n.y*ch, age:60});
+            });
+        }
+    };
+
+    useEffect(()=>{
+        const iv=setInterval(()=>{
+            const {std,sw}=S.current;
+            setStats({std:{hits:std.hits,cols:std.cols},sw:{hits:sw.hits,cols:sw.cols}});
+            if(Date.now()-S.current._busTimer>2000){
+                MemoryBus.write('tech',{stdHits:std.hits,stdWaste:std.cols,swHits:sw.hits,swWaste:sw.cols,ratio:sw.hits/Math.max(1,std.hits),_version:sw.hits});
+                onBusUpdate();
+                S.current._busTimer=Date.now();
+            }
+        },300);
+        return()=>clearInterval(iv);
+    },[]);
+
+    useEffect(()=>{
+        const resize=()=>{
+            [canvasStdRef,canvasSwRef].forEach(r=>{
+                if(r.current?.parentElement){r.current.width=r.current.parentElement.clientWidth;r.current.height=r.current.parentElement.clientHeight;}
+            });
+        };
+        window.addEventListener('resize',resize); setTimeout(resize,80);
+        return()=>window.removeEventListener('resize',resize);
+    },[]);
+
+    const runEngine = (s, canvas, isSwarm) => {
+        if(!canvas) return;
+        const ctx=canvas.getContext('2d'),cw=canvas.width,ch=canvas.height;
+        const obs=LOSS_OBS(cw,ch);
+
+        if(!s.init&&cw>0&&ch>0){
+            s.bots=[];
+            for(let i=0;i<20;i++) s.bots.push({x:cw/2,y:ch*0.65,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,color:isSwarm?'#34d399':'#38bdf8',size:2});
+            if(isSwarm) seedFromBus(s, cw, ch);
+            s.init=true;
+        }
+        if(!s.init) return;
+
+        if(Date.now()-s.lastSpawn>1200&&s.targets.length<12){
+            const pts=[{x:cw*0.05,y:ch*0.1},{x:cw*0.92,y:ch*0.1},{x:cw*0.05,y:ch*0.88},{x:cw*0.92,y:ch*0.88},{x:cw*0.5,y:ch*0.1}];
+            const pt=pts[Math.floor(Math.random()*pts.length)];
+            s.targets.push({x:pt.x+(Math.random()-0.5)*cw*0.04,y:pt.y+(Math.random()-0.5)*ch*0.04,consumed:false,pulse:0});
+            s.lastSpawn=Date.now();
+        }
+
+        s.bots.forEach(bot=>{
+            let fx=0,fy=0,wall=false;
+
+            if(isSwarm){
+                // Repulse from visited (avoid local minima)
+                s.visited.forEach(n=>{const dx=bot.x-n.x,dy=bot.y-n.y,d2=dx*dx+dy*dy;if(d2<3500&&d2>0.1){const d=Math.sqrt(d2);fx+=(dx/d)*0.6;fy+=(dy/d)*0.6;}});
+                // Attract to global minima (targets)
+                let minD=Infinity;
+                s.targets.forEach(t=>{if(t.consumed)return;const dx=t.x-bot.x,dy=t.y-bot.y,d2=dx*dx+dy*dy;if(d2<100000&&d2<minD){minD=d2;const d=Math.sqrt(d2);fx+=(dx/d)*3;fy+=(dy/d)*3;}});
+                // Boundary + obstacle avoidance
+                const M=14;if(bot.x<M)fx+=0.8;else if(bot.x>cw-M)fx-=0.8;if(bot.y<M)fy+=0.8;else if(bot.y>ch-M)fy-=0.8;
+                obs.forEach(o=>{if(bot.x>o.x-14&&bot.x<o.x+o.w+14&&bot.y>o.y-14&&bot.y<o.y+o.h+14){if(bot.x<o.x)fx-=0.8;else if(bot.x>o.x+o.w)fx+=0.8;if(bot.y<o.y)fy-=0.8;else if(bot.y>o.y+o.h)fy+=0.8;}});
+            } else {
+                bot.vx+=(Math.random()-0.5)*2.5;bot.vy+=(Math.random()-0.5)*2.5;
+            }
+
+            s.targets.forEach(t=>{if(!t.consumed){const dx=t.x-bot.x,dy=t.y-bot.y;if(dx*dx+dy*dy<(isSwarm?280:100)){t.consumed=true;s.hits++;}}});
+
+            if(isSwarm){bot.vx+=fx+(Math.random()-0.5)*0.3;bot.vy+=fy+(Math.random()-0.5)*0.3;}
+            const spLim=isSwarm?5.5:3.0;const sp=Math.sqrt(bot.vx*bot.vx+bot.vy*bot.vy);if(sp>spLim){bot.vx=(bot.vx/sp)*spLim;bot.vy=(bot.vy/sp)*spLim;}
+
+            bot.x+=bot.vx;bot.y+=bot.vy;
+            if(bot.x<0){bot.x=0;bot.vx*=-1;wall=true;}else if(bot.x>cw){bot.x=cw;bot.vx*=-1;wall=true;}
+            if(bot.y<0){bot.y=0;bot.vy*=-1;wall=true;}else if(bot.y>ch){bot.y=ch;bot.vy*=-1;wall=true;}
+            obs.forEach(o=>{if(bot.x>o.x&&bot.x<o.x+o.w&&bot.y>o.y&&bot.y<o.y+o.h){bot.x-=bot.vx;bot.vx*=-1;bot.y-=bot.vy;bot.vy*=-1;wall=true;}});
+            if(wall)s.cols++;
+            if(isSwarm&&Math.random()<0.2){s.visited.push({x:bot.x,y:bot.y,age:120});if(s.visited.length>180)s.visited.shift();}
+        });
+
+        s.targets.forEach(t=>t.pulse=(t.pulse||0)+0.07);
+        s.targets=s.targets.filter(t=>!t.consumed);
+        s.visited.forEach(n=>n.age--);s.visited=s.visited.filter(n=>n.age>0);
+
+        // ---- RENDER ----
+        ctx.fillStyle=isSwarm?'rgba(2,6,23,0.35)':'rgba(15,5,5,0.35)'; ctx.fillRect(0,0,cw,ch);
+
+        // Loss landscape: gradient background
+        if(isSwarm){
+            const g=ctx.createRadialGradient(cw/2,ch/2,0,cw/2,ch/2,Math.max(cw,ch)*0.7);
+            g.addColorStop(0,'rgba(52,211,153,0.04)'); g.addColorStop(1,'transparent');
+            ctx.fillStyle=g; ctx.fillRect(0,0,cw,ch);
+        } else {
+            const g=ctx.createRadialGradient(cw/2,ch/2,0,cw/2,ch/2,Math.max(cw,ch)*0.7);
+            g.addColorStop(0,'rgba(56,189,248,0.03)'); g.addColorStop(1,'transparent');
+            ctx.fillStyle=g; ctx.fillRect(0,0,cw,ch);
+        }
+
+        // Obstacles (local minima traps)
+        ctx.fillStyle='rgba(8,47,73,0.5)';ctx.strokeStyle='rgba(14,165,233,0.4)';ctx.lineWidth=1;
+        obs.forEach(o=>{ctx.fillRect(o.x,o.y,o.w,o.h);ctx.strokeRect(o.x,o.y,o.w,o.h);});
+
+        // Visited heatmap (explored parameter space)
+        if(isSwarm){
+            s.visited.forEach(n=>{
+                ctx.beginPath();ctx.rect(n.x-1,n.y-1,2,2);
+                ctx.fillStyle=`rgba(56,189,248,${n.age/400})`;ctx.fill();
+            });
+            // Mesh
+            ctx.lineWidth=0.3;
+            for(let i=0;i<s.bots.length;i++)for(let j=i+1;j<s.bots.length;j++){
+                const b1=s.bots[i],b2=s.bots[j],dx=b1.x-b2.x,dy=b1.y-b2.y;
+                if(dx*dx+dy*dy<12000){ctx.beginPath();ctx.moveTo(b1.x,b1.y);ctx.lineTo(b1.x,b2.y);ctx.lineTo(b2.x,b2.y);ctx.strokeStyle='rgba(52,211,153,0.25)';ctx.stroke();}
+            }
+        }
+
+        // Global minima targets
+        s.targets.forEach(t=>{
+            const p=Math.sin(t.pulse||0)*2;
+            ctx.beginPath();ctx.arc(t.x,t.y,8+p,0,Math.PI*2);
+            ctx.fillStyle='rgba(244,63,94,0.6)';ctx.fill();
+            ctx.strokeStyle='#f43f5e';ctx.lineWidth=1.2;ctx.stroke();
+            ctx.fillStyle='#fff';ctx.font='7px Syne Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText('⊕',t.x,t.y);
+        });
+
+        s.bots.forEach(bot=>{
+            ctx.beginPath();ctx.rect(bot.x-bot.size,bot.y-bot.size,bot.size*2,bot.size*2);
+            ctx.fillStyle=bot.color;ctx.shadowBlur=6;ctx.shadowColor=bot.color;ctx.fill();ctx.shadowBlur=0;
+        });
+    };
+
+    const update=useCallback(()=>{
+        runEngine(S.current.std,canvasStdRef.current,false);
+        runEngine(S.current.sw,canvasSwRef.current,true);
+        rafRef.current=requestAnimationFrame(update);
+    },[]);
+
+    useEffect(()=>{rafRef.current=requestAnimationFrame(update);return()=>cancelAnimationFrame(rafRef.current);},[update]);
+
+    const handleReset=()=>{
+        ['std','sw'].forEach(k=>{S.current[k]={bots:[],visited:[],targets:[],lastSpawn:0,hits:0,cols:0,init:false};});
+        setStats({std:{hits:0,cols:0},sw:{hits:0,cols:0}});
+        MemoryBus.clearNamespace('tech'); onBusUpdate();
+    };
+
+    const ratio = stats.std.hits>0?(stats.sw.hits/stats.std.hits).toFixed(2):'—';
+    const wasteSaved = stats.std.cols>0?((1-stats.sw.cols/stats.std.cols)*100).toFixed(0):'—';
+
+    return (
+        <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>
+            <div style={{display:'flex',alignItems:'stretch',background:'rgba(2,8,16,0.8)',borderBottom:'1px solid rgba(0,255,231,0.1)',flexShrink:0}}>
+                {[
+                    {l:'Method',v:'Blind GD',col:'#38bdf8'},
+                    {l:'Minima Found',v:stats.std.hits},
+                    {l:'Wasted Cycles',v:stats.std.cols,col:'#f87171'},
+                    {l:'',v:'vs',col:'rgba(200,216,232,0.3)'},
+                    {l:'Method',v:'Holo Optimizer',col:'#34d399'},
+                    {l:'Minima Found',v:stats.sw.hits,col:'#34d399'},
+                    {l:'Wasted Cycles',v:stats.sw.cols,col:'#34d399'},
+                    {l:'Speedup Ratio',v:ratio+'×',col:'#00ffe7'},
+                    {l:'Waste Saved',v:wasteSaved==='—'?'—':`${wasteSaved}%`,col:'#00ffe7'},
+                ].map(({l,v,col},i)=>(
+                    <div key={i} style={{flex:1,padding:'6px 10px',borderRight:'1px solid rgba(0,255,231,0.06)',textAlign:'center'}}>
+                        <div style={{fontSize:8,textTransform:'uppercase',letterSpacing:'0.1em',color:'rgba(200,216,232,0.35)',marginBottom:2}}>{l}</div>
+                        <div className="mono" style={{fontSize:13,color:col||'#c8d8e8'}}>{v}</div>
+                    </div>
+                ))}
+                <button onClick={handleReset} style={{padding:'0 14px',border:'none',borderLeft:'1px solid rgba(0,255,231,0.1)',background:'transparent',color:'rgba(0,255,231,0.5)',cursor:'pointer',fontSize:11}}>↺</button>
+            </div>
+            <div style={{flex:1,display:'flex',minHeight:0}}>
+                <div style={{flex:1,position:'relative',borderRight:'1px solid rgba(0,255,231,0.08)'}} className="canvas-wrap">
+                    <canvas ref={canvasStdRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+                    <div style={{position:'absolute',top:8,left:8,fontFamily:'Syne Mono,monospace',fontSize:9,color:'#38bdf8',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(15,5,5,0.85)',padding:'4px 8px',border:'1px solid rgba(56,189,248,0.3)'}}>M1 · Gets Stuck</div>
+                </div>
+                <div style={{flex:1,position:'relative'}} className="canvas-wrap">
+                    <canvas ref={canvasSwRef} style={{position:'absolute',inset:0,width:'100%',height:'100%',display:'block'}}/>
+                    <div style={{position:'absolute',top:8,left:8,fontFamily:'Syne Mono,monospace',fontSize:9,color:'#34d399',letterSpacing:'0.1em',textTransform:'uppercase',background:'rgba(2,8,16,0.85)',padding:'4px 8px',border:'1px solid rgba(52,211,153,0.3)'}}>M2 · Holo Optimizer (seeds from Swarm bus)</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// TAB 5: MEMORY BUS INSPECTOR — NEW
+// Live view of all cross-app shared state
+// ============================================================
+const BusInspector = ({ busStats, onBusUpdate }) => {
+    const [busData, setBusData] = useState({});
+    const [selected, setSelected] = useState('billiard');
+
+    useEffect(()=>{
+        const iv=setInterval(()=>{
+            setBusData(MemoryBus.read());
+        },500);
+        return()=>clearInterval(iv);
+    },[]);
+
+    const ns = busData[selected];
+    const keys = ['billiard','swarm','medical','tech'];
+
+    return (
+        <div style={{flex:1,display:'flex',minHeight:0,overflow:'hidden'}}>
+            <div className="sidebar" style={{width:180}}>
+                <div className="section-label">Namespaces</div>
+                {keys.map(k=>{
+                    const d=busData[k];
+                    return (
+                        <div key={k} onClick={()=>setSelected(k)} style={{padding:'6px 8px',borderRadius:3,border:`1px solid ${selected===k?'rgba(0,255,231,0.4)':'rgba(0,255,231,0.08)'}`,background:selected===k?'rgba(0,255,231,0.06)':'transparent',cursor:'pointer',marginBottom:4}}>
+                            <div style={{fontFamily:'Syne Mono,monospace',fontSize:10,color:selected===k?'#00ffe7':'rgba(200,216,232,0.5)',textTransform:'uppercase',letterSpacing:'0.1em'}}>{k}</div>
+                            {d && <div style={{fontSize:8,color:'rgba(200,216,232,0.3)',marginTop:2}}>v{d._version||0} · {Object.keys(d).filter(k=>!k.startsWith('_')).length} fields</div>}
+                            {!d && <div style={{fontSize:8,color:'rgba(200,216,232,0.2)',marginTop:2}}>empty</div>}
+                        </div>
+                    );
+                })}
+                <div style={{borderTop:'1px solid rgba(0,255,231,0.1)',paddingTop:8,marginTop:4}}>
+                    <button className="export-btn" onClick={()=>MemoryBus.exportFull()} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                        <Icon.Download s={10}/> Export All
+                    </button>
+                </div>
+                <div style={{marginTop:8}}>
+                    <div className="section-label">How to connect</div>
+                    <div style={{fontSize:8,color:'rgba(200,216,232,0.4)',lineHeight:1.6,fontFamily:'Syne Mono,monospace'}}>
+                        In your next app:<br/>
+                        <span style={{color:'#00ffe7'}}>const bus = JSON.parse(localStorage.getItem('genesis_memory_bus_v2'))</span><br/><br/>
+                        Then read any namespace:<br/>
+                        <span style={{color:'#00ffe7'}}>bus.swarm.visitedNodes</span><br/>
+                        <span style={{color:'#00ffe7'}}>bus.billiard.inversionPaths</span>
+                    </div>
+                </div>
+            </div>
+            <div style={{flex:1,padding:20,overflow:'auto',fontFamily:'Syne Mono,monospace'}}>
+                <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12}}>
+                    <span style={{fontSize:11,color:'#00ffe7',textTransform:'uppercase',letterSpacing:'0.15em'}}>{selected}</span>
+                    {ns && <span style={{fontSize:9,color:'rgba(200,216,232,0.4)'}}>Last updated: {new Date(ns._ts||0).toLocaleTimeString()} · Version {ns._version||0}</span>}
+                    {!ns && <span style={{fontSize:9,color:'rgba(200,216,232,0.3)'}}>No data — run the simulation first</span>}
+                </div>
+                {ns && Object.entries(ns).map(([k,v])=>{
+                    if(k.startsWith('_ts')) return null;
+                    const isArr = Array.isArray(v);
+                    const display = isArr ? `Array[${v.length}] ${JSON.stringify(v.slice(0,2))}...` : typeof v==='object'?JSON.stringify(v,null,1):String(v);
+                    return (
+                        <div key={k} style={{display:'flex',gap:12,marginBottom:6,padding:'5px 8px',background:'rgba(0,255,231,0.02)',border:'1px solid rgba(0,255,231,0.06)',borderRadius:2}}>
+                            <span style={{fontSize:9,color:'rgba(0,255,231,0.6)',minWidth:160,flexShrink:0}}>{k}</span>
+                            <span style={{fontSize:9,color:'rgba(200,216,232,0.7)',wordBreak:'break-all'}}>{display}</span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// ============================================================
+// ROOT APP
+// ============================================================
+const App = () => {
+    const [activeTab, setActiveTab] = useState(1);
+    const [busStats, setBusStats] = useState({});
+
+    const refreshBus = useCallback(()=>{
+        setBusStats(MemoryBus.read());
+    },[]);
+
+    useEffect(()=>{
+        const iv=setInterval(refreshBus,1000);
+        return()=>clearInterval(iv);
+    },[]);
+
+    const tabs = [
+        {id:1, label:'Billiard Inv.', icon:<Icon.Box/>},
+        {id:2, label:'Zeta Swarm',   icon:<Icon.Network/>},
+        {id:3, label:'Medical A/B',  icon:<Icon.Heart/>},
+        {id:4, label:'Tech/DL A/B',  icon:<Icon.Cpu/>},
+        {id:5, label:'Bus Inspector',icon:<Icon.Globe/>},
+    ];
+
+    return (
+        <div style={{display:'flex',flexDirection:'column',height:'100dvh',overflow:'hidden'}}>
+            {/* Header */}
+            <header style={{flexShrink:0,background:'rgba(2,8,16,0.97)',borderBottom:'1px solid rgba(0,255,231,0.12)',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{width:32,height:32,border:'1px solid rgba(0,255,231,0.4)',display:'flex',alignItems:'center',justifyContent:'center',color:'#00ffe7',flexShrink:0}}>
+                        <Icon.Activity s={16}/>
+                    </div>
+                    <div>
+                        <div style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:14,letterSpacing:'0.05em',color:'#fff'}}>PROJECT GENESIS</div>
+                        <div style={{fontFamily:'Syne Mono,monospace',fontSize:8,letterSpacing:'0.2em',color:'rgba(0,255,231,0.5)',textTransform:'uppercase'}}>Holographic Intelligence Engine v2</div>
+                    </div>
+                </div>
+                <div style={{display:'flex',gap:4,overflow:'auto'}} className="scrollbar-hide">
+                    {tabs.map(t=>(
+                        <button key={t.id} className={`tab-btn ${activeTab===t.id?'active':''}`} onClick={()=>setActiveTab(t.id)}>
+                            <span style={{display:'flex',alignItems:'center',gap:5}}>{t.icon}{t.label}</span>
+                        </button>
+                    ))}
+                </div>
+                <div style={{fontFamily:'Syne Mono,monospace',fontSize:8,color:'rgba(0,255,231,0.3)',letterSpacing:'0.1em',flexShrink:0}}>
+                    BUS v{busStats._version||0}
+                </div>
+            </header>
+            <div className="header-line"/>
+            {/* Main */}
+            <main style={{flex:1,display:'flex',flexDirection:'column',minHeight:0,overflow:'hidden'}}>
+                {activeTab===1 && <BilliardSim busStats={busStats} onBusUpdate={refreshBus}/>}
+                {activeTab===2 && <ZetaSwarmSim busStats={busStats} onBusUpdate={refreshBus}/>}
+                {activeTab===3 && <MedicalSim busStats={busStats} onBusUpdate={refreshBus}/>}
+                {activeTab===4 && <TechSim busStats={busStats} onBusUpdate={refreshBus}/>}
+                {activeTab===5 && <BusInspector busStats={busStats} onBusUpdate={refreshBus}/>}
+            </main>
+        </div>
+    );
+};
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
 </body>
 </html>
