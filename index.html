@@ -8,6 +8,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=Syne+Mono&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -28,7 +29,7 @@
             height: 100dvh;
         }
         .mono { font-family: 'Syne Mono', monospace; }
-        
+
         /* Scanline overlay */
         body::after {
             content: '';
@@ -162,44 +163,67 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
+// Supabase configuration
+const supabaseUrl = 'https://jeddcrgchxvdhhmxuxpr.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplZGRjcmdjaHh2ZGlobXh1eHByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDQ4NjAsImV4cCI6MjA4Njk4MDg2MH0.WnCrWYXYsJPlxMj-RisMHBCveKUgI7HlBh0Peh1T6Vw';
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
 // ============================================================
 // GENESIS MEMORY BUS — Universal shared state between all apps
 // All data written here is readable by any app on this device
+// Now backed by Supabase instead of localStorage
+// Assumes a Supabase table 'memory_bus' with columns: namespace (text, primary key), data (jsonb)
 // ============================================================
-const MEMORY_BUS_KEY = 'genesis_memory_bus_v2';
+const MEMORY_BUS_TABLE = 'memory_bus'; // Table name in your Supabase "brains v3" app
 
 const MemoryBus = {
-    read() {
-        try { return JSON.parse(localStorage.getItem(MEMORY_BUS_KEY) || '{}'); }
-        catch { return {}; }
+    async read() {
+        const { data, error } = await supabase.from(MEMORY_BUS_TABLE).select('namespace, data');
+        if (error) {
+            console.error('MemoryBus read error:', error);
+            return {};
+        }
+        const bus = {};
+        data.forEach(row => {
+            bus[row.namespace] = row.data;
+        });
+        return bus;
     },
-    write(namespace, data) {
-        const bus = this.read();
+    async write(namespace, data) {
+        const bus = await this.read();
         bus[namespace] = { ...data, _ts: Date.now(), _ns: namespace };
         bus._lastWrite = namespace;
         bus._version = (bus._version || 0) + 1;
-        localStorage.setItem(MEMORY_BUS_KEY, JSON.stringify(bus));
+
+        const { error } = await supabase.from(MEMORY_BUS_TABLE).upsert({
+            namespace: namespace,
+            data: bus[namespace]
+        }, { onConflict: 'namespace' });
+        if (error) console.error('MemoryBus write error:', error);
     },
-    readNamespace(namespace) {
-        const bus = this.read();
-        return bus[namespace] || null;
+    async readNamespace(namespace) {
+        const { data, error } = await supabase.from(MEMORY_BUS_TABLE).select('data').eq('namespace', namespace).single();
+        if (error) {
+            console.error('MemoryBus readNamespace error:', error);
+            return null;
+        }
+        return data ? data.data : null;
     },
-    exportFull() {
-        const bus = this.read();
+    async exportFull() {
+        const bus = await this.read();
         const blob = new Blob([JSON.stringify(bus, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url;
         a.download = `genesis_memory_${Date.now()}.json`; a.click();
         URL.revokeObjectURL(url);
     },
-    clearNamespace(namespace) {
-        const bus = this.read();
-        delete bus[namespace];
-        localStorage.setItem(MEMORY_BUS_KEY, JSON.stringify(bus));
+    async clearNamespace(namespace) {
+        const { error } = await supabase.from(MEMORY_BUS_TABLE).delete().eq('namespace', namespace);
+        if (error) console.error('MemoryBus clearNamespace error:', error);
     },
     // Read coverage map as a normalized 0-1 grid (for next app consumption)
-    getCoverageGrid(namespace, gridW=20, gridH=20) {
-        const ns = this.readNamespace(namespace);
+    async getCoverageGrid(namespace, gridW=20, gridH=20) {
+        const ns = await this.readNamespace(namespace);
         if (!ns || !ns.visitedNodes) return null;
         const grid = Array.from({length:gridH}, () => new Array(gridW).fill(0));
         ns.visitedNodes.forEach(n => {
@@ -250,7 +274,7 @@ const Icon = {
 // MEMORY BUS PANEL — shown in all tabs
 // ============================================================
 const MemoryBusPanel = ({ busStats }) => {
-    const handleExport = () => MemoryBus.exportFull();
+    const handleExport = async () => await MemoryBus.exportFull();
 
     return (
         <div className="memory-bus">
@@ -315,9 +339,17 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
     ];
 
     useEffect(() => {
-        const saved = MemoryBus.readNamespace('billiard');
-        if (saved) { stateRef.current.winding=saved.winding||0; stateRef.current.corners=saved.corners||0; stateRef.current.configs=saved.configs||0; }
-        const iv = setInterval(() => {
+        const loadSaved = async () => {
+            const saved = await MemoryBus.readNamespace('billiard');
+            if (saved) { 
+                stateRef.current.winding = saved.winding || 0; 
+                stateRef.current.corners = saved.corners || 0; 
+                stateRef.current.configs = saved.configs || 0; 
+            }
+        };
+        loadSaved();
+
+        const iv = setInterval(async () => {
             const s = stateRef.current;
             setStats({winding:s.winding, corners:s.corners, configs:s.configs, invPoints:s.invPoints});
             if (Date.now() - s._busTimer > 2000) {
@@ -325,7 +357,7 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
                 const canvas = canvasRef.current;
                 const cw = canvas?.width||1, ch = canvas?.height||1;
                 const normLog = s.inversionLog.slice(-200).map(p => ({x:p.x/cw, y:p.y/ch}));
-                MemoryBus.write('billiard', {
+                await MemoryBus.write('billiard', {
                     winding:s.winding, corners:s.corners, configs:s.configs,
                     inversionPaths: normLog,
                     invRadius, boundScale, particleCount,
@@ -550,11 +582,11 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
         return () => { if(rafRef.current) cancelAnimationFrame(rafRef.current); };
     }, [isRunning, draw]);
 
-    const handleReset = () => {
+    const handleReset = async () => {
         stateRef.current.particles=[]; stateRef.current.winding=0; stateRef.current.corners=0; stateRef.current.configs=0;
         stateRef.current.invPoints=0; stateRef.current.inversionLog=[];
         setStats({winding:0,corners:0,configs:0,invPoints:0});
-        MemoryBus.clearNamespace('billiard'); onBusUpdate();
+        await MemoryBus.clearNamespace('billiard'); onBusUpdate();
     };
 
     return (
@@ -596,7 +628,7 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
                             <input type="checkbox" checked={val} onChange={()=>set(v=>!v)} disabled={disabled}/>
                         </div>
                     ))}
-                    {pyramidMode && <p style={{fontSize:8,color:'rgba(0,255,231,0.6)',lineHeight:1.5,fontStyle:'italic'}}>Scale boundary ~30%. Place glass pyramid on center cross.</p>}
+                    {pyramidMode && <p style={{fontSize:8,color:'rgba(0,255,231,0.6)',lineHeight:1.5,fontStyle:'italic'}}>Scale boundary \~30%. Place glass pyramid on center cross.</p>}
                 </div>
 
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
@@ -656,9 +688,13 @@ const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
     ];
 
     useEffect(() => {
-        const saved = MemoryBus.readNamespace('swarm');
-        if (saved) S.current.zetaCount = saved.zetaCount || 0;
-        const iv = setInterval(() => {
+        const loadSaved = async () => {
+            const saved = await MemoryBus.readNamespace('swarm');
+            if (saved) S.current.zetaCount = saved.zetaCount || 0;
+        };
+        loadSaved();
+
+        const iv = setInterval(async () => {
             const s = S.current;
             setZetaSorted(s.zetaCount);
             if (s.newLogs.length > 0) {
@@ -672,7 +708,7 @@ const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
                 const GW=40, GH=40;
                 s.visitedNodes.forEach(n => {
                     const gx = Math.floor((n.x/cw)*GW), gy = Math.floor((n.y/ch)*GH);
-                    s.coveredCells.add(`${gx},${gy}`);
+                    s.coveredCells.add(`\( {gx}, \){gy}`);
                 });
                 const cov = (s.coveredCells.size/(GW*GH)*100);
                 setCoverage(cov);
@@ -681,7 +717,7 @@ const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
 
                 if (Date.now()-s._busTimer > 2000) {
                     const normVisited = s.visitedNodes.slice(-150).map(n=>({x:n.x/cw,y:n.y/ch,age:n.age}));
-                    MemoryBus.write('swarm', {
+                    await MemoryBus.write('swarm', {
                         zetaCount:s.zetaCount, coverage:cov, efficiency:eff,
                         visitedNodes: normVisited,
                         squadEfficiency: s.squadEfficiency,
@@ -817,7 +853,7 @@ const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
         s.visitedNodes.forEach(n=>{
             const col = n.squad===0?'0,255,231':n.squad===1?'255,62,108':'255,183,0';
             ctx.beginPath(); ctx.arc(n.x,n.y,3,0,Math.PI*2);
-            ctx.fillStyle=`rgba(${col},${n.age/600})`; ctx.fill();
+            ctx.fillStyle=`rgba(\( {col}, \){n.age/600})`; ctx.fill();
         });
 
         // Mesh lines between nearby same-squad bots
@@ -861,11 +897,11 @@ const ZetaSwarmSim = ({ busStats, onBusUpdate }) => {
         return ()=>{if(rafRef.current) cancelAnimationFrame(rafRef.current);};
     },[isRunning,update]);
 
-    const handleReset = () => {
+    const handleReset = async () => {
         S.current.zetaCount=0; S.current.newLogs=[]; S.current.bots=[]; S.current.init=false;
         S.current.coveredCells=new Set(); S.current.squadEfficiency=[0,0,0];
         setZetaSorted(0); setDataLog([]); setCoverage(0);
-        MemoryBus.clearNamespace('swarm'); onBusUpdate();
+        await MemoryBus.clearNamespace('swarm'); onBusUpdate();
     };
 
     return (
@@ -959,16 +995,20 @@ const MedicalSim = ({ busStats, onBusUpdate }) => {
     ];
 
     useEffect(() => {
-        const saved = MemoryBus.readNamespace('medical');
-        if (saved) {
-            S.current.std.hits=saved.stdHits||0; S.current.std.damage=saved.stdDamage||0;
-            S.current.sw.hits=saved.swHits||0; S.current.sw.damage=saved.swDamage||0;
-        }
-        const iv = setInterval(() => {
+        const loadSaved = async () => {
+            const saved = await MemoryBus.readNamespace('medical');
+            if (saved) {
+                S.current.std.hits=saved.stdHits||0; S.current.std.damage=saved.stdDamage||0;
+                S.current.sw.hits=saved.swHits||0; S.current.sw.damage=saved.swDamage||0;
+            }
+        };
+        loadSaved();
+
+        const iv = setInterval(async () => {
             const {std,sw}=S.current;
             setStats({std:{hits:std.hits,cols:std.cols,damage:std.damage},sw:{hits:sw.hits,cols:sw.cols,damage:sw.damage}});
             if(Date.now()-S.current._busTimer>2000){
-                MemoryBus.write('medical',{
+                await MemoryBus.write('medical',{
                     stdHits:std.hits,stdDamage:std.damage,
                     swHits:sw.hits,swDamage:sw.damage,
                     efficiency:sw.hits/Math.max(1,std.hits),
@@ -1096,10 +1136,10 @@ const MedicalSim = ({ busStats, onBusUpdate }) => {
 
     useEffect(()=>{rafRef.current=requestAnimationFrame(update);return()=>cancelAnimationFrame(rafRef.current);},[update]);
 
-    const handleReset=()=>{
+    const handleReset= async ()=>{
         ['std','sw'].forEach(k=>{S.current[k]={bots:[],visited:[],targets:[],healthy:[],lastSpawn:0,hits:0,cols:0,damage:0,init:false};});
         setStats({std:{hits:0,cols:0,damage:0},sw:{hits:0,cols:0,damage:0}});
-        MemoryBus.clearNamespace('medical'); onBusUpdate();
+        await MemoryBus.clearNamespace('medical'); onBusUpdate();
     };
 
     const improvement = stats.std.hits>0 ? ((stats.sw.hits/stats.std.hits-1)*100).toFixed(0) : '—';
@@ -1173,8 +1213,8 @@ const TechSim = ({ busStats, onBusUpdate }) => {
     ];
 
     // Seed swarm with previously learned coverage from memory bus
-    const seedFromBus = (s, cw, ch) => {
-        const swarmData = MemoryBus.readNamespace('swarm');
+    const seedFromBus = async (s, cw, ch) => {
+        const swarmData = await MemoryBus.readNamespace('swarm');
         if (swarmData?.visitedNodes) {
             swarmData.visitedNodes.forEach(n => {
                 s.visited.push({x:n.x*cw, y:n.y*ch, age:60});
@@ -1183,11 +1223,11 @@ const TechSim = ({ busStats, onBusUpdate }) => {
     };
 
     useEffect(()=>{
-        const iv=setInterval(()=>{
+        const iv=setInterval(async ()=>{
             const {std,sw}=S.current;
             setStats({std:{hits:std.hits,cols:std.cols},sw:{hits:sw.hits,cols:sw.cols}});
             if(Date.now()-S.current._busTimer>2000){
-                MemoryBus.write('tech',{stdHits:std.hits,stdWaste:std.cols,swHits:sw.hits,swWaste:sw.cols,ratio:sw.hits/Math.max(1,std.hits),_version:sw.hits});
+                await MemoryBus.write('tech',{stdHits:std.hits,stdWaste:std.cols,swHits:sw.hits,swWaste:sw.cols,ratio:sw.hits/Math.max(1,std.hits),_version:sw.hits});
                 onBusUpdate();
                 S.current._busTimer=Date.now();
             }
@@ -1205,7 +1245,7 @@ const TechSim = ({ busStats, onBusUpdate }) => {
         return()=>window.removeEventListener('resize',resize);
     },[]);
 
-    const runEngine = (s, canvas, isSwarm) => {
+    const runEngine = async (s, canvas, isSwarm) => {
         if(!canvas) return;
         const ctx=canvas.getContext('2d'),cw=canvas.width,ch=canvas.height;
         const obs=LOSS_OBS(cw,ch);
@@ -1213,7 +1253,7 @@ const TechSim = ({ busStats, onBusUpdate }) => {
         if(!s.init&&cw>0&&ch>0){
             s.bots=[];
             for(let i=0;i<20;i++) s.bots.push({x:cw/2,y:ch*0.65,vx:(Math.random()-0.5)*4,vy:(Math.random()-0.5)*4,color:isSwarm?'#34d399':'#38bdf8',size:2});
-            if(isSwarm) seedFromBus(s, cw, ch);
+            if(isSwarm) await seedFromBus(s, cw, ch);
             s.init=true;
         }
         if(!s.init) return;
@@ -1306,18 +1346,18 @@ const TechSim = ({ busStats, onBusUpdate }) => {
         });
     };
 
-    const update=useCallback(()=>{
-        runEngine(S.current.std,canvasStdRef.current,false);
-        runEngine(S.current.sw,canvasSwRef.current,true);
+    const update=useCallback(async ()=>{
+        await runEngine(S.current.std,canvasStdRef.current,false);
+        await runEngine(S.current.sw,canvasSwRef.current,true);
         rafRef.current=requestAnimationFrame(update);
     },[]);
 
-    useEffect(()=>{rafRef.current=requestAnimationFrame(update);return()=>cancelAnimationFrame(rafRef.current);},[update]);
+    useEffect(()=>{rafRef.current=requestAnimationFrame(async () => await update());return()=>cancelAnimationFrame(rafRef.current);},[update]);
 
-    const handleReset=()=>{
+    const handleReset= async ()=>{
         ['std','sw'].forEach(k=>{S.current[k]={bots:[],visited:[],targets:[],lastSpawn:0,hits:0,cols:0,init:false};});
         setStats({std:{hits:0,cols:0},sw:{hits:0,cols:0}});
-        MemoryBus.clearNamespace('tech'); onBusUpdate();
+        await MemoryBus.clearNamespace('tech'); onBusUpdate();
     };
 
     const ratio = stats.std.hits>0?(stats.sw.hits/stats.std.hits).toFixed(2):'—';
@@ -1367,8 +1407,8 @@ const BusInspector = ({ busStats, onBusUpdate }) => {
     const [selected, setSelected] = useState('billiard');
 
     useEffect(()=>{
-        const iv=setInterval(()=>{
-            setBusData(MemoryBus.read());
+        const iv=setInterval(async ()=>{
+            setBusData(await MemoryBus.read());
         },500);
         return()=>clearInterval(iv);
     },[]);
@@ -1391,7 +1431,7 @@ const BusInspector = ({ busStats, onBusUpdate }) => {
                     );
                 })}
                 <div style={{borderTop:'1px solid rgba(0,255,231,0.1)',paddingTop:8,marginTop:4}}>
-                    <button className="export-btn" onClick={()=>MemoryBus.exportFull()} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                    <button className="export-btn" onClick={async ()=>await MemoryBus.exportFull()} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
                         <Icon.Download s={10}/> Export All
                     </button>
                 </div>
@@ -1435,14 +1475,14 @@ const App = () => {
     const [activeTab, setActiveTab] = useState(1);
     const [busStats, setBusStats] = useState({});
 
-    const refreshBus = useCallback(()=>{
-        setBusStats(MemoryBus.read());
-    },[]);
+    const refreshBus = useCallback(async () => {
+        setBusStats(await MemoryBus.read());
+    }, []);
 
-    useEffect(()=>{
-        const iv=setInterval(refreshBus,1000);
-        return()=>clearInterval(iv);
-    },[]);
+    useEffect(() => {
+        const iv = setInterval(async () => await refreshBus(), 1000);
+        return () => clearInterval(iv);
+    }, [refreshBus]);
 
     const tabs = [
         {id:1, label:'Billiard Inv.', icon:<Icon.Box/>},
