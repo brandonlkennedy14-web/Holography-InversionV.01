@@ -163,65 +163,112 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// Supabase configuration
-const supabaseUrl = 'https://jeddcrgchxvdhhmxuxpr.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplZGRjcmdjaHh2ZGlobXh1eHByIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0MDQ4NjAsImV4cCI6MjA4Njk4MDg2MH0.WnCrWYXYsJPlxMj-RisMHBCveKUgI7HlBh0Peh1T6Vw';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
-
 // ============================================================
-// GENESIS MEMORY BUS — Universal shared state between all apps
-// All data written here is readable by any app on this device
-// Now backed by Supabase instead of localStorage
-// Assumes a Supabase table 'memory_bus' with columns: namespace (text, primary key), data (jsonb)
+// GENESIS BRAIN — Single source of truth for all apps
+// Table: genesis_brain (namespace PK, version int, payload jsonb)
+// Project: inversion_sim_db
+// Raw fetch + raw WebSocket — no Supabase JS client needed
 // ============================================================
-const MEMORY_BUS_TABLE = 'memory_bus'; // Table name in your Supabase "brains v3" app
+const GB_URL  = 'https://xoolmbmnzbsvcqeyqvyi.supabase.co';
+const GB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhvb2xtYm1uemJzdmNleXhxdnlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE0NDMwNDQsImV4cCI6MjA4NzAxOTA0NH0.ebTwMZ_byU6EXtuR0jynct64QO5ornQrCwElQ5b9TxQ';
+const GB_API  = `${GB_URL}/rest/v1`;
+const GB_HDRS = { 'apikey': GB_KEY, 'Authorization': `Bearer ${GB_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
 
+// In-memory cache — updated by realtime WS push, never stale
+const _gbCache = { billiard:{}, swarm:{}, medical:{}, tech:{}, band:{}, _listeners:{} };
+
+const _gbEmit = (ns, payload) => (_gbCache._listeners[ns]||[]).forEach(fn => fn(payload));
+
+// Realtime WebSocket — receives every write instantly, no polling needed
+let _gbWS = null;
+const _gbConnect = () => {
+    _gbWS = new WebSocket(`${GB_URL.replace('https://','wss://')}/realtime/v1/websocket?apikey=${GB_KEY}&vsn=1.0.0`);
+    _gbWS.onopen = () => {
+        // Subscribe to all changes on genesis_brain table
+        _gbWS.send(JSON.stringify({
+            topic:'realtime:public:genesis_brain', event:'phx_join',
+            payload:{config:{broadcast:{self:false},presence:{key:''},postgres_changes:[{event:'*',schema:'public',table:'genesis_brain'}]}},
+            ref:'1'
+        }));
+    };
+    _gbWS.onmessage = e => {
+        try {
+            const msg = JSON.parse(e.data);
+            const rec = msg?.payload?.data?.record || msg?.payload?.data?.new;
+            if (rec?.namespace) {
+                _gbCache[rec.namespace] = { ...rec.payload, _version: rec.version };
+                _gbEmit(rec.namespace, _gbCache[rec.namespace]);
+            }
+        } catch(_) {}
+    };
+    // Reconnect on drop — realtime must stay live
+    _gbWS.onclose = () => setTimeout(_gbConnect, 4000);
+    // Supabase heartbeat every 25s
+    setInterval(() => { if(_gbWS?.readyState===1) _gbWS.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:null})); }, 25000);
+};
+
+// Load initial state then open WS
+const _gbInit = async () => {
+    try {
+        const r = await fetch(`${GB_API}/genesis_brain?select=*`, { headers: GB_HDRS });
+        const rows = await r.json();
+        if (Array.isArray(rows)) rows.forEach(row => { if(row.namespace) _gbCache[row.namespace] = { ...row.payload, _version: row.version }; });
+    } catch(e) { console.warn('GenesisBrain init fetch failed:', e); }
+    _gbConnect();
+};
+_gbInit();
+
+// MemoryBus — same API as before, backed by genesis_brain table
 const MemoryBus = {
+    // Read all namespaces from cache (populated by WS + initial fetch)
     async read() {
-        const { data, error } = await supabase.from(MEMORY_BUS_TABLE).select('namespace, data');
-        if (error) {
-            console.error('MemoryBus read error:', error);
-            return {};
-        }
-        const bus = {};
-        data.forEach(row => {
-            bus[row.namespace] = row.data;
-        });
-        return bus;
+        return { ..._gbCache };
     },
-    async write(namespace, data) {
-        const bus = await this.read();
-        bus[namespace] = { ...data, _ts: Date.now(), _ns: namespace };
-        bus._lastWrite = namespace;
-        bus._version = (bus._version || 0) + 1;
 
-        const { error } = await supabase.from(MEMORY_BUS_TABLE).upsert({
-            namespace: namespace,
-            data: bus[namespace]
-        }, { onConflict: 'namespace' });
-        if (error) console.error('MemoryBus write error:', error);
+    // Write a namespace — upsert to genesis_brain, WS broadcasts to all listeners
+    async write(namespace, data) {
+        const v = (_gbCache[namespace]?._version || 0) + 1;
+        const payload = { ...data, _ts: Date.now(), _ns: namespace };
+        _gbCache[namespace] = { ...payload, _version: v }; // optimistic local update
+        try {
+            await fetch(`${GB_API}/genesis_brain`, {
+                method: 'POST',
+                headers: { ...GB_HDRS, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+                body: JSON.stringify({ namespace, version: v, payload })
+            });
+        } catch(e) { console.error('GenesisBrain write error:', e); }
     },
+
+    // Read a single namespace from cache — instant, no round trip
     async readNamespace(namespace) {
-        const { data, error } = await supabase.from(MEMORY_BUS_TABLE).select('data').eq('namespace', namespace).single();
-        if (error) {
-            console.error('MemoryBus readNamespace error:', error);
-            return null;
-        }
-        return data ? data.data : null;
+        return _gbCache[namespace] || null;
     },
+
+    // Subscribe to realtime updates for a namespace
+    // fn(payload) called every time that namespace is written by ANY app
+    on(namespace, fn) {
+        if (!_gbCache._listeners[namespace]) _gbCache._listeners[namespace] = [];
+        _gbCache._listeners[namespace].push(fn);
+    },
+
     async exportFull() {
         const bus = await this.read();
         const blob = new Blob([JSON.stringify(bus, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url;
-        a.download = `genesis_memory_${Date.now()}.json`; a.click();
+        a.download = `genesis_brain_export_${Date.now()}.json`; a.click();
         URL.revokeObjectURL(url);
     },
+
     async clearNamespace(namespace) {
-        const { error } = await supabase.from(MEMORY_BUS_TABLE).delete().eq('namespace', namespace);
-        if (error) console.error('MemoryBus clearNamespace error:', error);
+        _gbCache[namespace] = {};
+        try {
+            await fetch(`${GB_API}/genesis_brain?namespace=eq.${namespace}`, {
+                method: 'DELETE', headers: GB_HDRS
+            });
+        } catch(e) { console.error('GenesisBrain clear error:', e); }
     },
-    // Read coverage map as a normalized 0-1 grid (for next app consumption)
+
     async getCoverageGrid(namespace, gridW=20, gridH=20) {
         const ns = await this.readNamespace(namespace);
         if (!ns || !ns.visitedNodes) return null;
@@ -283,7 +330,7 @@ const MemoryBusPanel = ({ busStats }) => {
                 Genesis Memory Bus
             </div>
             <div style={{padding:'8px 10px', display:'flex', flexDirection:'column', gap:4}}>
-                {['billiard','swarm','medical','tech'].map(ns => {
+                {['billiard','swarm','medical','tech','band'].map(ns => {
                     const d = busStats[ns];
                     return (
                         <div key={ns} style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -349,11 +396,35 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
         };
         loadSaved();
 
+        // React to live band data — no polling, WS push
+        // band.bpm pulses the inversion radius on each beat
+        // band.chaos modulates particle energy
+        // band.winding_bass/lead shapes the inversion path colour
+        MemoryBus.on('band', band => {
+            const s = stateRef.current;
+            if (!s) return;
+            // BPM → pulse inversion radius — radius breathes with the beat
+            if (band.bpm) {
+                const beatMs = 60000 / band.bpm;
+                s._bandPulse = { radius: band.invRadius || invRadius, bpm: band.bpm, beatMs, _t: Date.now() };
+            }
+            // Chaos → particle energy boost
+            if (band.chaos !== undefined) {
+                s.particles?.forEach(p => {
+                    const boost = 0.8 + band.chaos * 0.8;
+                    const spd = Math.sqrt(p.vel.x**2 + p.vel.y**2);
+                    if (spd > 0) { p.vel.x = (p.vel.x/spd)*boost*2.2; p.vel.y = (p.vel.y/spd)*boost*2.2; }
+                });
+            }
+            // Root midi → log it for display
+            if (band.rootMidi !== undefined) s._bandRoot = band.rootMidi;
+            s._bandActive = Date.now();
+        });
+
         const iv = setInterval(async () => {
             const s = stateRef.current;
             setStats({winding:s.winding, corners:s.corners, configs:s.configs, invPoints:s.invPoints});
             if (Date.now() - s._busTimer > 2000) {
-                // Normalize inversion log to 0-1 coords
                 const canvas = canvasRef.current;
                 const cw = canvas?.width||1, ch = canvas?.height||1;
                 const normLog = s.inversionLog.slice(-200).map(p => ({x:p.x/cw, y:p.y/ch}));
@@ -523,13 +594,31 @@ const BilliardSim = ({ busStats, onBusUpdate }) => {
                 ctx.fillStyle='rgba(255,183,0,0.8)'; ctx.fill();
             });
 
-            // Inversion circle
+            // Inversion circle — pulses to band BPM when band is live
             if (showInvCircle) {
-                ctx.beginPath(); ctx.arc(cx,cy,invRadius,0,Math.PI*2);
-                ctx.strokeStyle='rgba(0,255,231,0.2)'; ctx.setLineDash([5,5]); ctx.lineWidth=0.8; ctx.stroke(); ctx.setLineDash([]);
-                // Radius label
-                ctx.fillStyle='rgba(0,255,231,0.4)'; ctx.font='8px Syne Mono,monospace'; ctx.textAlign='left';
-                ctx.fillText(`r=${invRadius}px`, cx+invRadius+4, cy);
+                // Beat pulse: radius swells on downbeat, decays between beats
+                let drawR = invRadius;
+                let circleAlpha = 0.2;
+                let circleColor = '0,255,231';
+                const bp = s._bandPulse;
+                const bandLive = s._bandActive && (Date.now() - s._bandActive < 4000);
+                if (bp && bandLive) {
+                    const phase = ((Date.now() - bp._t) % bp.beatMs) / bp.beatMs; // 0→1 per beat
+                    const pulse = Math.pow(1 - phase, 2.5); // sharp attack, smooth decay
+                    drawR = invRadius + pulse * 18;
+                    circleAlpha = 0.2 + pulse * 0.55;
+                    circleColor = '255,183,0'; // amber when synced to band
+                    // Beat ring — expanding circle on attack
+                    if (pulse > 0.85) {
+                        const ringR = invRadius + (1-pulse)*60;
+                        ctx.beginPath(); ctx.arc(cx,cy,ringR,0,Math.PI*2);
+                        ctx.strokeStyle=`rgba(255,183,0,${(pulse-0.85)*3})`; ctx.lineWidth=1.5; ctx.setLineDash([]); ctx.stroke();
+                    }
+                }
+                ctx.beginPath(); ctx.arc(cx,cy,drawR,0,Math.PI*2);
+                ctx.strokeStyle=`rgba(${circleColor},${circleAlpha})`; ctx.setLineDash([5,5]); ctx.lineWidth=bandLive?1.4:0.8; ctx.stroke(); ctx.setLineDash([]);
+                ctx.fillStyle=`rgba(${circleColor},0.4)`; ctx.font='8px Syne Mono,monospace'; ctx.textAlign='left';
+                ctx.fillText(bandLive ? `r=${drawR|0}px ♪${bp?.bpm|0}` : `r=${invRadius}px`, cx+drawR+4, cy);
             }
 
             // Center cross
@@ -1414,7 +1503,7 @@ const BusInspector = ({ busStats, onBusUpdate }) => {
     },[]);
 
     const ns = busData[selected];
-    const keys = ['billiard','swarm','medical','tech'];
+    const keys = ['billiard','swarm','medical','tech','band'];
 
     return (
         <div style={{flex:1,display:'flex',minHeight:0,overflow:'hidden'}}>
@@ -1435,14 +1524,17 @@ const BusInspector = ({ busStats, onBusUpdate }) => {
                         <Icon.Download s={10}/> Export All
                     </button>
                 </div>
-                <div style={{marginTop:8}}>
+                    <div style={{marginTop:8}}>
                     <div className="section-label">How to connect</div>
                     <div style={{fontSize:8,color:'rgba(200,216,232,0.4)',lineHeight:1.6,fontFamily:'Syne Mono,monospace'}}>
-                        In your next app:<br/>
-                        <span style={{color:'#00ffe7'}}>const bus = JSON.parse(localStorage.getItem('genesis_memory_bus_v2'))</span><br/><br/>
-                        Then read any namespace:<br/>
-                        <span style={{color:'#00ffe7'}}>bus.swarm.visitedNodes</span><br/>
-                        <span style={{color:'#00ffe7'}}>bus.billiard.inversionPaths</span>
+                        Any app connects via:<br/>
+                        <span style={{color:'#00ffe7'}}>GB_URL = 'https://xoolmbmnzbsvcqeyqvyi.supabase.co'</span><br/><br/>
+                        Read any namespace live:<br/>
+                        <span style={{color:'#00ffe7'}}>_gbCache.band.bpm</span><br/>
+                        <span style={{color:'#00ffe7'}}>_gbCache.billiard.winding</span><br/>
+                        <span style={{color:'#00ffe7'}}>_gbCache.swarm.visitedNodes</span><br/><br/>
+                        React to updates:<br/>
+                        <span style={{color:'#00ffe7'}}>MemoryBus.on('band', payload =&gt; {'{}'})</span>
                     </div>
                 </div>
             </div>
